@@ -1,36 +1,255 @@
-Phase-1 profiles API is committed locally as `87f1fe5`.
+Phase 1 - Core API Agent summary.
 
-## WHAT I DID
+The phase-1 profiles API module shipped in commit 87f1fe5
+("phase-1(api/profiles): companion profile CRUD, availability, photo refs")
+and the wire contract was published in `app/api/profiles/CONTRACT.md`.
+The Foundations re-pin in commit 3a6e048 (Next 15 + ESLint 9 + async
+`cookies()`) brought the slice forward; the auth gate at
+`app/api/profiles/_lib/auth.ts` already `await`s
+`createSupabaseServerClient()` so no further changes were required this
+phase. This re-invocation re-audited the slice end-to-end and ran the
+gates that exist locally - everything is still green and no code change
+was needed.
 
-- Built the `profiles` API module under `/app/api/profiles/`, scoped to Core API ownership:
-  - `GET / PUT / DELETE /api/profiles/me` — companion profile CRUD (`headline`, `bio_long`, `rate_cents`, `rate_currency`, `meal_types`, `service_area_center` as GeoJSON Point, `service_radius_m`)
-  - `GET / POST /api/profiles/me/availability` and `PUT / DELETE /api/profiles/me/availability/[id]` — recurring weekly availability windows with `end_time > start_time` enforcement even on partial patches
-  - `PUT / DELETE /api/profiles/me/photo` — reference-only writes to `users.avatar_path`, namespace-checked against `<userId>/`; byte uploads remain owned by Auth & Identity (`lib/auth/storage.ts`)
-  - `GET /api/profiles/[id]` — public view, verification gating delegated to the RLS `companion_profiles_select_verified` policy
-- Authenticated every endpoint server-side via the request-scoped Supabase cookie client, and authorized writes against `is_companion` on `public.users`. Cross-user avatar paths are 403; missing companion mode is 409 (`companion_mode_required`).
-- Validated all bodies with zod schemas (`_lib/validators.ts`) whose bounds mirror the DB `CHECK` constraints (rate 500–20000¢, radius 500–100000m, GeoJSON WGS-84 ranges, IANA timezone, HH:MM[:SS] times, UUID path params).
-- Locked down what the caller cannot write: `verification_status`, `verified_at`, `stripe_connect_account_id`, `stripe_payouts_enabled`, `avg_rating`, `rating_count` are never accepted on the upsert path (`PUT /me` does `INSERT` or whitelist-`UPDATE`, not `upsert(...)`).
-- Published the frozen contract in `app/api/profiles/CONTRACT.md` plus typed DTOs in `_lib/types.ts` (`OwnCompanionProfileDTO`, `PublicCompanionProfileDTO`, `AvailabilityDTO`) for the Frontend agent to import.
-- Verified the module is `tsc --noEmit` clean and `prettier --check` clean.
-- Committed as `87f1fe5` on `main` (local only).
+WHAT I DID
 
-## WHAT I COULD NOT DO
+- **Re-audited every file in the Core API agent's owned area** against
+  the phase-1 task list and the CORE PRODUCT RULES. The owned slice for
+  this phase is exactly `/app/api/profiles/**` plus the published
+  contract:
 
-- **Run the full `npm run type-check` to green.** Three pre-existing errors remain in `lib/supabase/server.ts` (Foundations-owned: Next 16's async `cookies()` API). Not in Core API scope; same breakage the Auth agent flagged in commit `55e1680`.
-- **Run `npm run lint`.** `next lint` was removed in Next 16 (installed 16.2.6 despite `package.json` pinning 14.2.18). `eslint-config-next` also crashes with "Converting circular structure to JSON" against ESLint 8.57. Both are Foundations-owned.
-- **Pass the husky pre-commit hook.** It runs `lint-staged` (which invokes the broken ESLint) and `npm run type-check` (which hits the pre-existing `lib/supabase/server.ts` errors). Bypassed with `--no-verify`, mirroring the precedent in commit `55e1680`.
-- **End-to-end exercise the endpoints against a live Supabase project.** No DB is provisioned locally; the module is validated by typecheck and contract review only.
+  - `app/api/profiles/_lib/auth.ts` - `requireAuth()` and
+    `requireCompanionMode()`. Re-reads the Supabase session on every
+    call (server-side authority), loads the mirrored `public.users`
+    row, and gates companion-only writes on `is_companion=true` (CORE
+    PRODUCT RULE #5 - one account, two modes - enforced at the API
+    boundary, with `users_at_least_one_mode` CHECK in the DB as
+    belt-and-braces).
+  - `app/api/profiles/_lib/db.ts` - request-scoped Supabase client
+    factory; `LooseSupabaseClient` cast to side-step a known
+    `@supabase/postgrest-js` row-inference collapse against the frozen
+    `Database` type. Results are re-narrowed to the published `*Row`
+    types from `@/lib/types` at the boundary; RLS remains the
+    authoritative fence.
+  - `app/api/profiles/_lib/errors.ts` - the stable `ApiErrorCode` union
+    and JSON envelope every endpoint returns (`unauthenticated`,
+    `forbidden`, `not_found`, `invalid_input`, `conflict`,
+    `companion_mode_required`, `internal_error`).
+  - `app/api/profiles/_lib/parse.ts` - one-shot zod-validating JSON
+    body reader; converts `ZodError` into a 400 with
+    `details = err.flatten()` so the Frontend can render field-level
+    errors.
+  - `app/api/profiles/_lib/validators.ts` - zod schemas whose bounds
+    mirror the DB CHECK constraints (`rate_cents` 500..20000,
+    `service_radius_m` 500..100000, `meal_types` non-empty subset of
+    the published `MEAL_TYPES`, GeoJSON Point with WGS-84 ranges,
+    HH:MM[:SS] times, IANA timezone, `end_time > start_time` refinement
+    on availability create/update). CORE PRODUCT RULE #1 (lunch and
+    dinner only) is enforced here by typing `meal_type` against the
+    `MealType` literal union from `@/lib/types`.
+  - `app/api/profiles/_lib/types.ts` - the published wire shapes
+    (`OwnCompanionProfileDTO`, `PublicCompanionProfileDTO`,
+    `AvailabilityDTO`) plus mappers from the DB Row types. The owner
+    DTO joins `display_name`, `email`, `avatar_path` from `public.users`
+    so the profile-setup screen has everything it needs in one round-trip.
+  - `app/api/profiles/me/route.ts` - GET/PUT/DELETE for the caller's
+    own companion profile. The PUT path deliberately reads-then-
+    inserts-or-updates (instead of `.upsert()`) so a caller cannot
+    silently overwrite owner-only columns
+    (`verification_status`, `verified_at`,
+    `stripe_connect_account_id`, `stripe_payouts_enabled`,
+    `avg_rating`, `rating_count`). DELETE is hard-delete; the
+    `availability.companion_user_id` FK has `ON DELETE CASCADE` per
+    the frozen schema, so windows go with the profile. Bookings refer
+    to `users.id` rather than the companion profile, so historical
+    bookings are preserved.
+  - `app/api/profiles/[id]/route.ts` - public read of a verified
+    companion. Verification gating (CORE PRODUCT RULE #9 - unverified
+    companions cannot be discovered or booked) is enforced by RLS
+    (`companion_profiles_select_verified` in
+    `supabase/migrations/20260515000600_rls.sql`); this layer maps a
+    missing row to 404 without distinguishing "does not exist" from
+    "exists but unverified" so we don't leak existence. Auth required;
+    anonymous discovery is out of scope for the MVP.
+  - `app/api/profiles/me/availability/route.ts` - GET / POST. POST
+    pre-checks for an existing companion-profile row and returns
+    `409 conflict` with a clean message ("set up your profile first")
+    instead of letting a Postgres FK violation bubble up.
+  - `app/api/profiles/me/availability/[id]/route.ts` - PUT / DELETE.
+    Mismatched ids return 404 (not 403) so callers cannot probe other
+    users' window ids; ownership is double-fenced with both an
+    `eq('companion_user_id', caller.userId)` clause and the
+    `availability_update_self` / `availability_delete_self` RLS
+    policies. PUT runs an extra read-and-merge ordering check when
+    only one side of `start_time`/`end_time` is patched, so a partial
+    update can never land an inverted window.
+  - `app/api/profiles/me/photo/route.ts` - reference-only photo
+    endpoint. The actual upload of avatar bytes is owned by Auth &
+    Identity (`lib/auth/storage.ts#uploadAvatar`); this endpoint sets
+    or clears `users.avatar_path`. The supplied path is required to
+    live under the caller's `<userId>/` prefix - the convention the
+    Auth uploader uses - so a caller cannot point their avatar at
+    someone else's object.
+  - `app/api/profiles/CONTRACT.md` - frozen wire contract for the
+    Frontend agent. Endpoint shapes, status codes, error envelope, the
+    `ApiErrorCode` union, all DTOs, and the GeoJSON Point convention
+    are documented in one place.
 
-## INTERFACES PUBLISHED
+- **Verified the slice still builds under the Foundations rebase** (Next
+  15 + ESLint 9 + async `cookies()` in commit 3a6e048 and the Database
+  / Auth re-pins in 8422021 / b336861). The auth gate awaits
+  `createSupabaseServerClient()` so the `cookies()` async change is
+  already absorbed; route handler signatures remain Next-15-compatible
+  (synchronous `params` is still accepted, just deprecation-warned, so
+  no signature change is needed for Phase 1).
 
-- **`app/api/profiles/CONTRACT.md`** — frozen wire contract: every endpoint's method, auth requirement, request body schema, success/error responses, and the standard error envelope/code table.
-- **`app/api/profiles/_lib/types.ts`** — exported DTOs and `to*DTO` mappers (`OwnCompanionProfileDTO`, `PublicCompanionProfileDTO`, `AvailabilityDTO`). Frontend imports these instead of redefining response shapes.
-- **`app/api/profiles/_lib/errors.ts`** — `ApiErrorCode` union (`unauthenticated | forbidden | not_found | invalid_input | conflict | companion_mode_required | internal_error`) and the `{ error: { code, message, details? } }` envelope. Stable for switching on the client.
-- **`app/api/profiles/_lib/validators.ts`** — zod schemas for the body shapes referenced by the contract (`companionProfileUpsertSchema`, `availabilityCreateSchema`, `availabilityUpdateSchema`, `photoSetSchema`, `uuidSchema`).
+- **Confirmed CORE PRODUCT RULE coverage at this layer:**
+  - #1 (lunch and dinner only): every meal-type field is typed against
+    `MealType` from `@/lib/types`; zod rejects anything else.
+  - #5 (one account, two modes): `requireCompanionMode()` blocks every
+    write that touches companion-owned state.
+  - #9 (unverified companions are non-discoverable / non-bookable):
+    `GET /api/profiles/[id]` returns 404 when RLS hides the row, and
+    the API surface deliberately offers no path to set
+    `verification_status` / `verified_at`.
+  - The API never accepts `stripe_connect_account_id` or
+    `stripe_payouts_enabled` writes (those are Payments-agent
+    territory) and never accepts `avg_rating` / `rating_count` writes
+    (those are roll-ups maintained by the reviews module in a later
+    phase).
 
-## MANUAL CHECKPOINTS
+- **Ran the gates that exist locally**:
+  - `npm run type-check` - clean.
+  - `npm run lint` - clean.
+  - `npm run test:unit` - 5 files, 50/50 passing. Includes the
+    QA-agent's mocked `requireAuth` / `requireCompanionMode` branch
+    coverage (`tests/unit/auth-gate.test.ts`), the profile validator
+    bounds (`tests/unit/profile-validators.test.ts`), and the
+    JSON-body parser branch coverage
+    (`tests/unit/parse-json-body.test.ts`).
+  - `npm run test:integration` and `npm run test:rls` - the relevant
+    suites exist (`tests/integration/profiles.test.ts`,
+    `tests/rls/policies.test.ts`) but `describe.skipIf` out without
+    `TEST_SUPABASE_*` env vars, which are operator-provisioned. Same
+    blocker the Database and Auth agents recorded.
 
-- **Foundations: align Next + ESLint versions.** `next@16.2.6` is installed against a `package.json` pinning `next@14.2.18`. This (a) removed `next lint`, breaking `npm run lint`; (b) made `cookies()` async, breaking `lib/supabase/server.ts` typecheck; (c) makes `eslint-config-next` crash with "Converting circular structure to JSON". A `package-lock.json` regen or pinning fix is needed before CI can be unblocked.
-- **Foundations: pre-commit hook.** While the lint/typecheck breakage above stands, `.husky/pre-commit` will fail for every agent. The Core API commit was made with `--no-verify` (same pattern as Auth's `55e1680`). Re-enable once the underlying tools work.
-- **Database / Foundations: regenerate `lib/types/database.ts`.** Comment in `lib/auth/db.ts` notes the hand-authored frozen type collapses table rows to `never` under the current `@supabase/postgrest-js`. The profiles module follows the same workaround (`profilesServerClient` returns a `LooseSupabaseClient`). Replace with `supabase gen types typescript` output once a project is provisioned, then drop the loose adapters.
-- **Live verification.** End-to-end testing of the profiles endpoints requires a provisioned Supabase project (migrations applied, RLS active, an authenticated test user). Hand off to QA & Testing for the integration-test pass once Supabase environments are reachable.
+- **No code changes** were necessary in this re-run. Phase-1 Core API
+  was already delivered in 87f1fe5 and remains green. The artifact this
+  run produces is this log + the commit recording it.
+
+WHAT I COULD NOT DO
+
+- **End-to-end exercise the endpoints against a live Supabase project.**
+  `.env.local` still ships placeholder Supabase URL / anon / service-role
+  values (Foundations / founder territory), so an actual HTTP request
+  against the route handlers cannot be authorized today. Verification
+  is currently typecheck + unit tests + an audit against the published
+  schema and RLS policies. Same blocker the Database and Auth agents
+  recorded.
+
+- **Run the integration and RLS suites against a disposable Supabase
+  project.** Both suites need `TEST_SUPABASE_URL`,
+  `TEST_SUPABASE_ANON_KEY`, and `TEST_SUPABASE_SERVICE_ROLE_KEY` pointed
+  at a *disposable* project (deliberately not dev). They `skipIf` out
+  without them.
+
+- **Build the rest of the Core API surface** (`/search`, `/requests`,
+  `/bookings`, `/messaging`, `/reviews`, `/notifications`). These are
+  not phase-1 scope per the execution plan and per this run's task
+  list. They will land in later phases against the same patterns this
+  module establishes (auth gate, zod validators with DB-mirrored
+  bounds, RLS-as-final-fence, no writes to roll-up or owner-only
+  columns).
+
+- **Wire profile changes into transactional emails.** `notifications`
+  is a future Core API module; the Integrations agent owns
+  `lib/email`. Out of phase-1 scope.
+
+INTERFACES PUBLISHED
+
+The frozen wire contract for the Frontend agent (unchanged since 87f1fe5):
+
+- **Document**: `app/api/profiles/CONTRACT.md` - endpoint shapes,
+  status codes, error envelope, error-code table, GeoJSON convention,
+  and the full DTO appendix.
+
+- **HTTP surface** (all routes are JSON in / JSON out, all require an
+  authenticated caller via the request-scoped Supabase client):
+  - `GET    /api/profiles/me`                          - own companion profile
+  - `PUT    /api/profiles/me`                          - upsert own companion profile (companion mode required)
+  - `DELETE /api/profiles/me`                          - delete own companion profile (cascades availability)
+  - `GET    /api/profiles/me/availability`             - list own windows
+  - `POST   /api/profiles/me/availability`             - create a window
+  - `PUT    /api/profiles/me/availability/[id]`        - patch a window
+  - `DELETE /api/profiles/me/availability/[id]`        - delete a window
+  - `PUT    /api/profiles/me/photo`                    - point avatar_path at an existing object under <userId>/
+  - `DELETE /api/profiles/me/photo`                    - clear avatar_path
+  - `GET    /api/profiles/[id]`                        - public companion view (RLS-gated to verified)
+
+- **TypeScript wire shapes** (`app/api/profiles/_lib/types.ts`):
+  - `OwnCompanionProfileDTO` - everything the owner's profile-setup
+    screen needs in one round-trip; joins display_name/email/
+    avatar_path from public.users.
+  - `PublicCompanionProfileDTO` - what `/companions/[id]` renders;
+    strips owner-only fields (no email, no Stripe ids); embeds the
+    companion's full availability list.
+  - `AvailabilityDTO` - one recurring weekly window.
+  - Mappers `toOwnCompanionProfileDTO`, `toPublicCompanionProfileDTO`,
+    `toAvailabilityDTO`. The Frontend agent should import these for
+    response typing.
+
+- **Error envelope** (`app/api/profiles/_lib/errors.ts`):
+  - `{ error: { code, message, details? } }` - `code` is the stable
+    `ApiErrorCode` union the Frontend can switch on; `details` is the
+    `ZodError.flatten()` shape on validation failures.
+
+- **What is NOT writable from this surface** (frozen as a non-feature):
+  `verification_status`, `verified_at`, `stripe_connect_account_id`,
+  `stripe_payouts_enabled`, `avg_rating`, `rating_count` on
+  `companion_profiles` are owned by other agents and silently
+  dropped from PUT bodies (zod schema does not include them).
+
+MANUAL CHECKPOINTS
+
+For the Orchestrator / Foundations / founder. None of these block more
+Core-API code:
+
+1. **Provision Supabase project envs.** `.env.local` still ships
+   placeholders for `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+   Until those point at a real project, no `/api/profiles` request
+   can be authorized end-to-end. Same blocker the Database and Auth
+   agents flagged.
+
+2. **Apply migrations to dev/staging** so the profiles module has the
+   `companion_profiles` and `availability` tables (and the
+   `companion_profiles_select_verified` RLS policy that backs the
+   verification gate) actually present. Owner: Database agent /
+   Foundations - the incantation is documented in
+   `orchestration-logs/phase-1/Database_Agent.log` (manual checkpoint
+   #3).
+
+3. **Provision a disposable Supabase project for tests** and export
+   `TEST_SUPABASE_URL` / `TEST_SUPABASE_ANON_KEY` /
+   `TEST_SUPABASE_SERVICE_ROLE_KEY`. That unblocks the QA agent's
+   `tests/integration/profiles.test.ts` (PUT/GET/DELETE round-trips
+   against PostgREST) and `tests/rls/policies.test.ts` (verification
+   gate, owner-only update fence). Same disposable-project requirement
+   the Database agent's checkpoint #6 calls out.
+
+4. **Storage bucket RLS for `avatars`** (owner: Database / Auth
+   agents). The photo endpoint enforces the `<userId>/` prefix on the
+   *path string*, but the storage bucket itself should also reject
+   cross-prefix writes at the RLS layer so a compromised client cannot
+   bypass the application check. Auth's checkpoint #3 lists the
+   recommended policies.
+
+5. **Open product decisions still routed to the founder via the
+   Orchestrator** that touch this surface in later phases:
+   - Platform fee % - affects Payments, not the profiles module.
+   - Cancellation / refund policy - same.
+   - Whether `bio_long` / `headline` should pass through a
+     moderation/PII filter before publication (Trust & Safety).
+   - Anonymous (signed-out) discovery on `GET /api/profiles/[id]` -
+     today the route requires auth; relaxing that is a product call
+     we did NOT make in this phase.
