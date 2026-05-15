@@ -16,8 +16,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "echo 'TODO(database-agent): wire up supabase migration runner' && exit 0",
-    "db:seed": "echo 'TODO(database-agent): wire up supabase seed runner' && exit 0",
+    "db:migrate": "bash scripts/db/migrate.sh",
+    "db:seed": "bash scripts/db/seed.sh",
     "prepare": "husky"
   },
   "dependencies": {
