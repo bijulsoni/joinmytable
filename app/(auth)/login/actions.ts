@@ -13,16 +13,13 @@ const LoginSchema = z.object({
   password: z.string().min(1, 'Password is required.'),
 });
 
-export type LoginState =
-  | { status: 'idle' }
-  | { status: 'error'; message: string };
+export type LoginState = { status: 'idle' } | { status: 'error'; message: string };
 
-export async function loginAction(
-  _prev: LoginState,
-  formData: FormData,
-): Promise<LoginState> {
+export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const parsed = LoginSchema.safeParse({
-    email: String(formData.get('email') ?? '').trim().toLowerCase(),
+    email: String(formData.get('email') ?? '')
+      .trim()
+      .toLowerCase(),
     password: String(formData.get('password') ?? ''),
   });
   if (!parsed.success) {
@@ -32,7 +29,7 @@ export async function loginAction(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -42,8 +39,7 @@ export async function loginAction(
     log.info({ err: error?.message }, 'login failed');
     return {
       status: 'error',
-      message:
-        error?.message ?? 'Sign in failed. Check your email and password.',
+      message: error?.message ?? 'Sign in failed. Check your email and password.',
     };
   }
 

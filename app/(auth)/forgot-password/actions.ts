@@ -20,7 +20,9 @@ export async function forgotPasswordAction(
   formData: FormData,
 ): Promise<ForgotState> {
   const parsed = Schema.safeParse({
-    email: String(formData.get('email') ?? '').trim().toLowerCase(),
+    email: String(formData.get('email') ?? '')
+      .trim()
+      .toLowerCase(),
   });
   if (!parsed.success) {
     return {
@@ -30,7 +32,7 @@ export async function forgotPasswordAction(
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${appUrl}/callback?next=/reset-password`,

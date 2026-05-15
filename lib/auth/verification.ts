@@ -21,12 +21,7 @@ import 'server-only';
 // equivalent) is out of scope for this phase - see MANUAL CHECKPOINTS.
 
 import { authAdminClient, authServerClient } from './db';
-import type {
-  CompanionProfileUpdate,
-  UserRow,
-  UserUpdate,
-  VerificationStatus,
-} from '@/lib/types';
+import type { CompanionProfileUpdate, UserRow, UserUpdate, VerificationStatus } from '@/lib/types';
 
 export interface CompanionVerificationInput {
   /**
@@ -60,7 +55,7 @@ export async function submitCompanionVerification(
     return { ok: false, error: 'A verification document is required.' };
   }
 
-  const supabase = authServerClient();
+  const supabase = await authServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'Not signed in.' };
 
@@ -98,8 +93,7 @@ export async function submitCompanionVerification(
   }
   return {
     ok: true,
-    status: (updated as { verification_status: VerificationStatus })
-      .verification_status,
+    status: (updated as { verification_status: VerificationStatus }).verification_status,
   };
 }
 
@@ -109,9 +103,7 @@ export async function submitCompanionVerification(
  * is called from server actions that observe those events so the column
  * stays in sync.
  */
-export async function reconcileSeekerVerification(
-  userId: string,
-): Promise<void> {
+export async function reconcileSeekerVerification(userId: string): Promise<void> {
   const admin = authAdminClient();
 
   const { data: authUser } = await admin.auth.admin.getUserById(userId);
@@ -128,9 +120,7 @@ export async function reconcileSeekerVerification(
   > | null;
   if (!row || !row.is_seeker) return;
 
-  const eligible =
-    Boolean(authUser.user.email_confirmed_at) &&
-    Boolean(row.guidelines_accepted_at);
+  const eligible = Boolean(authUser.user.email_confirmed_at) && Boolean(row.guidelines_accepted_at);
 
   const target: VerificationStatus = eligible ? 'verified' : 'unverified';
   if (row.seeker_verification_status === target) return;

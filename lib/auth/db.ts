@@ -13,15 +13,12 @@ import 'server-only';
 // the documented contract is preserved at the boundary.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import {
-  createSupabaseAdminClient,
-  createSupabaseServerClient,
-} from '@/lib/supabase/server';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/supabase/server';
 
 export type LooseSupabaseClient = SupabaseClient<any, any, any, any>;
 
-export function authServerClient(): LooseSupabaseClient {
-  return createSupabaseServerClient() as unknown as LooseSupabaseClient;
+export async function authServerClient(): Promise<LooseSupabaseClient> {
+  return (await createSupabaseServerClient()) as unknown as LooseSupabaseClient;
 }
 
 export function authAdminClient(): LooseSupabaseClient {

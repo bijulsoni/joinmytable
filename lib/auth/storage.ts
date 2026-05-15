@@ -86,21 +86,17 @@ function validateImage(file: Blob, maxBytes: number): string | null {
   return null;
 }
 
-async function uploadBlob(
-  input: UploadInput,
-): Promise<StorageUploadResult | StorageUploadError> {
+async function uploadBlob(input: UploadInput): Promise<StorageUploadResult | StorageUploadError> {
   const validationError = validateImage(input.file, input.maxBytes);
   if (validationError) return { ok: false, error: validationError };
 
   await ensureBucket(input.bucket, input.publicBucket);
 
   const admin = createSupabaseAdminClient();
-  const { error } = await admin.storage
-    .from(input.bucket)
-    .upload(input.objectKey, input.file, {
-      upsert: input.upsert ?? true,
-      contentType: input.file.type,
-    });
+  const { error } = await admin.storage.from(input.bucket).upload(input.objectKey, input.file, {
+    upsert: input.upsert ?? true,
+    contentType: input.file.type,
+  });
 
   if (error) return { ok: false, error: error.message };
   return { ok: true, path: input.objectKey };
@@ -112,10 +108,8 @@ async function uploadBlob(
  * for audit and re-rendering. Updates `users.avatar_path` to the new
  * key on success.
  */
-export async function uploadAvatar(
-  file: Blob,
-): Promise<StorageUploadResult | StorageUploadError> {
-  const supabase = authServerClient();
+export async function uploadAvatar(file: Blob): Promise<StorageUploadResult | StorageUploadError> {
+  const supabase = await authServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'Not signed in.' };
 
@@ -133,10 +127,7 @@ export async function uploadAvatar(
   if (!result.ok) return result;
 
   const update: UserUpdate = { avatar_path: result.path };
-  const { error: updErr } = await supabase
-    .from('users')
-    .update(update)
-    .eq('id', auth.user.id);
+  const { error: updErr } = await supabase.from('users').update(update).eq('id', auth.user.id);
   if (updErr) return { ok: false, error: updErr.message };
 
   return result;
@@ -149,7 +140,7 @@ export async function uploadAvatar(
 export async function uploadVerificationDocument(
   file: Blob,
 ): Promise<StorageUploadResult | StorageUploadError> {
-  const supabase = authServerClient();
+  const supabase = await authServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'Not signed in.' };
 
@@ -167,9 +158,7 @@ export async function uploadVerificationDocument(
 }
 
 /** Resolve a public avatar URL for rendering. Returns null when unset. */
-export async function avatarPublicUrl(
-  avatarPath: string | null,
-): Promise<string | null> {
+export async function avatarPublicUrl(avatarPath: string | null): Promise<string | null> {
   if (!avatarPath) return null;
   const admin = createSupabaseAdminClient();
   const { data } = admin.storage.from(AVATAR_BUCKET).getPublicUrl(avatarPath);

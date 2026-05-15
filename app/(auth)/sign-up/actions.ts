@@ -40,16 +40,13 @@ const SignUpSchema = z
     message: 'Pick at least one mode.',
   });
 
-export type SignUpState =
-  | { status: 'idle' }
-  | { status: 'error'; message: string };
+export type SignUpState = { status: 'idle' } | { status: 'error'; message: string };
 
-export async function signUpAction(
-  _prev: SignUpState,
-  formData: FormData,
-): Promise<SignUpState> {
+export async function signUpAction(_prev: SignUpState, formData: FormData): Promise<SignUpState> {
   const parsed = SignUpSchema.safeParse({
-    email: String(formData.get('email') ?? '').trim().toLowerCase(),
+    email: String(formData.get('email') ?? '')
+      .trim()
+      .toLowerCase(),
     password: String(formData.get('password') ?? ''),
     displayName: String(formData.get('displayName') ?? '').trim(),
     isSeeker: formData.get('isSeeker') === 'on',
@@ -64,7 +61,7 @@ export async function signUpAction(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: authResult, error: authError } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,

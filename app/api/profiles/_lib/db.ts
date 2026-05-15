@@ -14,6 +14,6 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export type LooseSupabaseClient = SupabaseClient<any, any, any, any>;
 
-export function profilesServerClient(): LooseSupabaseClient {
-  return createSupabaseServerClient() as unknown as LooseSupabaseClient;
+export async function profilesServerClient(): Promise<LooseSupabaseClient> {
+  return (await createSupabaseServerClient()) as unknown as LooseSupabaseClient;
 }

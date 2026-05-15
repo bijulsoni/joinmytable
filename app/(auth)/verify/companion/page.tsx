@@ -22,7 +22,7 @@ export default async function CompanionVerifyPage() {
     redirect('/mode');
   }
 
-  const supabase = authServerClient();
+  const supabase = await authServerClient();
   const { data: companionRaw } = await supabase
     .from('companion_profiles')
     .select('user_id, verification_status')
@@ -35,8 +35,7 @@ export default async function CompanionVerifyPage() {
       <div className={styles.card}>
         <h1 className={styles.heading}>Set up your companion profile first</h1>
         <p className={styles.subheading}>
-          We need your rate, service area, and availability before we can verify
-          you.
+          We need your rate, service area, and availability before we can verify you.
         </p>
         <div className={styles.linkRow}>
           <Link href="/profile">Open companion profile setup</Link>
@@ -50,8 +49,7 @@ export default async function CompanionVerifyPage() {
       <div className={styles.card}>
         <h1 className={styles.heading}>Verification in review</h1>
         <p className={styles.subheading}>
-          Thanks - we have what we need. We&apos;ll email you when review is
-          complete.
+          Thanks - we have what we need. We&apos;ll email you when review is complete.
         </p>
         <div className={styles.linkRow}>
           <Link href="/verify">Back to identity</Link>
@@ -64,9 +62,7 @@ export default async function CompanionVerifyPage() {
     return (
       <div className={styles.card}>
         <h1 className={styles.heading}>You&apos;re verified</h1>
-        <p className={styles.subheading}>
-          Seekers can now discover and book you.
-        </p>
+        <p className={styles.subheading}>Seekers can now discover and book you.</p>
       </div>
     );
   }

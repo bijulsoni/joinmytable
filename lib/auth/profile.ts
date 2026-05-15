@@ -46,9 +46,7 @@ export async function createUserMirrorRow(
       display_name: displayName,
       is_seeker: input.isSeeker,
       is_companion: input.isCompanion,
-      guidelines_accepted_at: input.acceptedGuidelines
-        ? new Date().toISOString()
-        : null,
+      guidelines_accepted_at: input.acceptedGuidelines ? new Date().toISOString() : null,
     } satisfies Partial<UserRow>,
     { onConflict: 'id' },
   );
@@ -73,7 +71,7 @@ export async function updateUserModes(input: {
     return { ok: false, error: 'You must keep at least one mode enabled.' };
   }
 
-  const supabase = authServerClient();
+  const supabase = await authServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) {
     return { ok: false, error: 'Not signed in.' };
@@ -101,20 +99,15 @@ export async function updateUserModes(input: {
  * the guidelines copy; this is the timestamp side-effect that gates
  * marketplace participation.
  */
-export async function acceptGuidelines(): Promise<
-  { ok: true } | { ok: false; error: string }
-> {
-  const supabase = authServerClient();
+export async function acceptGuidelines(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await authServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: 'Not signed in.' };
 
   const update: UserUpdate = {
     guidelines_accepted_at: new Date().toISOString(),
   };
-  const { error } = await supabase
-    .from('users')
-    .update(update)
-    .eq('id', auth.user.id);
+  const { error } = await supabase.from('users').update(update).eq('id', auth.user.id);
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };

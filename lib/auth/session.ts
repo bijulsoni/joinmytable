@@ -28,7 +28,7 @@ export interface SessionUser {
  * or the cookie is missing / expired.
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const supabase = authServerClient();
+  const supabase = await authServerClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) {
     return null;
@@ -53,9 +53,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
  * session is present. Use from server components and route handlers
  * that should be gated.
  */
-export async function requireSessionUser(
-  redirectTo: string = '/login',
-): Promise<SessionUser> {
+export async function requireSessionUser(redirectTo: string = '/login'): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) {
     redirect(redirectTo);
@@ -80,8 +78,7 @@ export async function requireMode(
     // will create it on demand.
     redirect('/verify');
   }
-  const allowed =
-    mode === 'seeker' ? user.profile.is_seeker : user.profile.is_companion;
+  const allowed = mode === 'seeker' ? user.profile.is_seeker : user.profile.is_companion;
   if (!allowed) {
     redirect('/mode');
   }

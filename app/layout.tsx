@@ -23,17 +23,13 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default async function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Resolve the current session server-side so the first paint already
   // reflects logged-in/out state. The AuthProvider keeps the session in
   // sync on the client via Supabase's onAuthStateChange.
   let initialSession = null;
   try {
-    const supabase = createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
     const { data } = await supabase.auth.getSession();
     initialSession = data.session ?? null;
   } catch {

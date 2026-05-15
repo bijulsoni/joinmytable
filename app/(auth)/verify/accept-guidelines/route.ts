@@ -8,7 +8,7 @@ import { reconcileSeekerVerification } from '@/lib/auth/verification';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) {
     return NextResponse.redirect(new URL('/login', request.url), { status: 303 });

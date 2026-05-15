@@ -17,8 +17,8 @@ import type { Database } from '@/lib/types';
  * signed-in user and RLS applies. Use this in API routes and Server
  * Components for any user-bound work.
  */
-export function createSupabaseServerClient() {
-  const cookieStore = cookies();
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {

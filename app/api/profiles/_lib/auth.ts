@@ -29,7 +29,7 @@ export type AuthResult = { ok: true; caller: AuthedCaller } | { ok: false; respo
  * a `NextResponse` 401 envelope when no session is present.
  */
 export async function requireAuth(): Promise<AuthResult> {
-  const supabase = profilesServerClient();
+  const supabase = await profilesServerClient();
   const { data: auth, error: authErr } = await supabase.auth.getUser();
   if (authErr || !auth?.user) {
     return { ok: false, response: apiError('unauthenticated', 'Sign in to continue.') };

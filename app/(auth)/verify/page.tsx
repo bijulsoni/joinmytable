@@ -33,7 +33,7 @@ export default async function VerifyPage() {
   const user = await requireSessionUser();
   const profile = user.profile;
 
-  const supabase = authServerClient();
+  const supabase = await authServerClient();
   const { data: companionRaw } = profile?.is_companion
     ? await supabase
         .from('companion_profiles')
@@ -49,8 +49,8 @@ export default async function VerifyPage() {
     <div className={styles.card}>
       <h1 className={styles.heading}>Identity & verification</h1>
       <p className={styles.subheading}>
-        Hi {profile?.display_name ?? user.email}. Finish these steps to get the
-        most out of JoinMyTable.
+        Hi {profile?.display_name ?? user.email}. Finish these steps to get the most out of
+        JoinMyTable.
       </p>
 
       {/* Email confirmation status */}
@@ -60,8 +60,7 @@ export default async function VerifyPage() {
           <div className={styles.success}>Your email is confirmed.</div>
         ) : (
           <div className={styles.notice}>
-            We sent a confirmation link to {user.email}. Open it from this device
-            to confirm.
+            We sent a confirmation link to {user.email}. Open it from this device to confirm.
           </div>
         )}
       </section>
@@ -78,8 +77,8 @@ export default async function VerifyPage() {
         ) : (
           <form action="/verify/accept-guidelines" method="post">
             <p className={styles.helpText}>
-              Read and accept the guidelines so we know you&apos;re on the same
-              page as the rest of the community.
+              Read and accept the guidelines so we know you&apos;re on the same page as the rest of
+              the community.
             </p>
             <button className={styles.secondary} type="submit">
               I accept the guidelines
@@ -115,13 +114,12 @@ export default async function VerifyPage() {
         <section>
           <h2 className={styles.label}>Companion verification</h2>
           <p className={styles.helpText}>
-            Companions go through a stronger check before they can be discovered
-            or booked.
+            Companions go through a stronger check before they can be discovered or booked.
           </p>
           {!companion && (
             <div className={styles.notice}>
-              Set up your companion profile (rate, service area, availability)
-              first. <Link href="/profile">Open companion profile setup</Link>.
+              Set up your companion profile (rate, service area, availability) first.{' '}
+              <Link href="/profile">Open companion profile setup</Link>.
             </div>
           )}
           {companion?.verification_status === 'verified' && (
@@ -181,9 +179,5 @@ function SeekerStatusPill({
   const missing: string[] = [];
   if (!emailConfirmed) missing.push('confirm your email');
   if (!guidelinesAcceptedAt) missing.push('accept the community guidelines');
-  return (
-    <div className={styles.notice}>
-      To finish seeker verification: {missing.join(', ')}.
-    </div>
-  );
+  return <div className={styles.notice}>To finish seeker verification: {missing.join(', ')}.</div>;
 }

@@ -17,9 +17,7 @@ const Schema = z
     message: 'Passwords do not match.',
   });
 
-export type ResetState =
-  | { status: 'idle' }
-  | { status: 'error'; message: string };
+export type ResetState = { status: 'idle' } | { status: 'error'; message: string };
 
 export async function resetPasswordAction(
   _prev: ResetState,
@@ -36,7 +34,7 @@ export async function resetPasswordAction(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) {
     return {
