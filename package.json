@@ -14,8 +14,12 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "type-check": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --dir tests/unit",
     "test:watch": "vitest",
+    "test:unit": "vitest run --dir tests/unit",
+    "test:integration": "vitest run --dir tests/integration",
+    "test:rls": "vitest run --dir tests/rls",
+    "test:all": "vitest run",
     "db:migrate": "bash scripts/db/migrate.sh",
     "db:seed": "bash scripts/db/seed.sh",
     "prepare": "husky"
