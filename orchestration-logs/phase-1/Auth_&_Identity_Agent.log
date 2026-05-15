@@ -1,0 +1,120 @@
+phase-1 / Auth & Identity Agent
+
+WHAT I DID
+- Built the auth screens under app/(auth)/: sign-up (screen 1) with email +
+  password, display name, mode select (seeker/companion), and guidelines
+  acceptance; login; forgot-password; reset-password; the Supabase OAuth
+  callback handler; a check-email landing for confirmation flows; and a
+  POST /logout route. Mobile-first styling via styles.module.css.
+- Wired Supabase Auth session handling: middleware.ts refreshes the
+  session cookie on every request; lib/auth/session.ts exposes
+  getSessionUser / requireSessionUser / requireMode for server code; the
+  client AuthProvider (lib/auth/context.tsx) is mounted in the root
+  layout so client components can read the session app-wide.
+- Implemented the one-account-two-modes model: sign-up captures both
+  flags, the public.users mirror row is upserted via the admin client,
+  app/(auth)/mode/ exposes a mode-switcher (server action calls
+  updateUserModes which enforces the "at least one mode" invariant
+  client-side AND defers to the schema check constraint).
+- Built the verification flow:
+  - Seeker (lighter): email confirmation (Supabase Auth) + guidelines
+    acceptance auto-promote users.seeker_verification_status to
+    'verified' via reconcileSeekerVerification (called from sign-up,
+    login, callback, and the accept-guidelines route).
+  - Companion (stronger): app/(auth)/verify/companion submits legal
+    name + an identity document. Document goes to a private
+    'verification' Storage bucket; companion_profiles.verification_status
+    moves to 'pending'. Admin-side transition to 'verified' is
+    intentionally out-of-scope (flagged below). RLS continues to enforce
+    that unverified companions are non-discoverable/non-bookable - core
+    product rule #9.
+- Implemented profile photo upload (lib/auth/storage.ts) with
+  server-side MIME + size validation, idempotent bucket provisioning,
+  and writeback of users.avatar_path. The AvatarUploader component is
+  surfaced in the verification hub.
+- Reflected auth state app-wide by wrapping children in <AuthProvider>
+  inside app/layout.tsx (resolves the initial session server-side).
+
+WHAT I COULD NOT DO
+- Could not actually run the dev server end-to-end - no Supabase
+  project is provisioned (Supabase URLs/keys are blank in .env.local
+  beyond placeholders). Type-check passes for all auth code; runtime
+  verification requires a live project.
+- Did not move companion_profiles.verification_status to 'verified' -
+  that requires the admin/review path (and ideally a third-party
+  identity provider like Stripe Identity or Persona). Out of scope for
+  Phase 1; the submission flow halts at 'pending'.
+- Did not introduce a Postgres trigger to mirror auth.users into
+  public.users automatically - that would be a Database-agent change.
+  The mirror row is created via the admin client from server actions
+  instead.
+- Did not address the pre-existing type-check failure in
+  lib/supabase/server.ts (cookies() became async in Next 16). The
+  Foundations agent owns that file; flagged under MANUAL CHECKPOINTS.
+
+INTERFACES PUBLISHED
+- Server (import from '@/lib/auth/session'):
+    getSessionUser(): Promise<SessionUser | null>
+    requireSessionUser(redirectTo?: string): Promise<SessionUser>
+    requireMode(mode: 'seeker' | 'companion'): Promise<SessionUser>
+    type SessionUser { id, email, emailConfirmed, profile: UserRow|null }
+- Client (import from '@/lib/auth'):
+    <AuthProvider initialSession={Session|null}>
+    useAuth(): { session, isLoading, signOut() }
+- Server (import from '@/lib/auth/profile'):
+    createUserMirrorRow(input)
+    updateUserModes({ isSeeker, isCompanion })
+    acceptGuidelines()
+- Server (import from '@/lib/auth/verification'):
+    submitCompanionVerification({ legalName, documentPath })
+    reconcileSeekerVerification(userId)
+- Server (import from '@/lib/auth/storage'):
+    uploadAvatar(blob), uploadVerificationDocument(blob),
+    avatarPublicUrl(path),
+    constants AVATAR_BUCKET = 'avatars', VERIFICATION_BUCKET = 'verification'
+- HTTP surface (Auth & Identity owned):
+    GET  /sign-up, /login, /forgot-password, /reset-password,
+         /check-email, /verify, /verify/companion, /mode
+    POST /logout
+    POST /verify/accept-guidelines
+    GET  /callback?code=...&next=... (Supabase email/PKCE exchange)
+
+MANUAL CHECKPOINTS
+- Storage buckets: lib/auth/storage.ts auto-creates 'avatars' (public)
+  and 'verification' (private) buckets via the service role on first
+  upload, but Storage RLS policies for these buckets should be
+  configured by the Database/Foundations agent (e.g. restrict 'avatars'
+  writes to the owning user's path prefix; restrict 'verification'
+  reads to admins). Auto-creation also depends on
+  SUPABASE_SERVICE_ROLE_KEY being set.
+- Email confirmation / redirect URLs: the Supabase project Auth
+  settings need the app URL added to the allow-list
+  (NEXT_PUBLIC_APP_URL), and the email templates should point to
+  /callback?code={code}&next=... for sign-up and
+  /callback?code={code}&next=/reset-password for password reset.
+  Configured in the Supabase dashboard - I did not modify project
+  config.
+- Identity verification provider: companion verification currently
+  ends at 'pending' and an admin must move the row to 'verified' (or
+  'rejected'). Wiring this to a real ID-check vendor (Stripe Identity,
+  Persona, Veriff) is a follow-up product decision - flagging it for
+  the Orchestrator and Trust & Safety review.
+- Pre-existing type-check failures owned by Foundations:
+    lib/supabase/server.ts uses synchronous `cookies()`, which became
+    async in Next 16 (installed version is 16.2.6, package.json pins
+    14.2.18 - the lockfile is ahead). The auth code is unaffected at
+    runtime, but `npm run type-check` will report 3 errors against
+    that file until Foundations rewrites the cookie adapter as async.
+- Pre-existing lint failure owned by Foundations:
+    `next lint` was removed in Next 15+; `npm run lint` now errors
+    out with "Invalid project directory provided". Needs to switch to
+    `eslint .` or the new lint integration.
+- Database type regeneration (Database agent): the hand-authored
+  `Database` shape in lib/types/database.ts no longer satisfies
+  supabase-js 2.105's `GenericSchema` constraints
+  (`Views: Record<string, never>` collapses every table to `never` in
+  query inference). The auth module uses local typed adapters
+  (lib/auth/db.ts) and projects results into the published Row types
+  to work around this. Removing the adapters is a one-line change
+  once Foundations regenerates the type via `supabase gen types
+  typescript`.
