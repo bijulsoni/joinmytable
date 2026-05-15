@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# Foundations agent: pre-commit gate.
+# Copy or symlink to .husky/pre-commit (see README "Pre-commit hook").
+#
+# Runs lint-staged (eslint --fix + prettier on staged files) and a
+# project-wide type-check. Keeps CI fast and catches issues locally.
+
+npx lint-staged
+npm run type-check

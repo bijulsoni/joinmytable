@@ -1,0 +1,50 @@
+All Phase 0 Database-agent work is done. Summary below.
+
+---
+
+## WHAT I DID
+
+**Migrations** in `supabase/migrations/` (timestamped, idempotent, identical across dev/staging/prod):
+
+- `20260515000100_init.sql` — extensions (`pgcrypto`, `postgis`, `citext`), the 10 enum types (`meal_type`, `verification_status`, `request_status`, `booking_status`, `budget_tier`, `payment_status`, `escrow_status`, `message_type`, `review_subject_type`, `cancellation_party`), and the shared `set_updated_at()` trigger function.
+- `20260515000200_users.sql` — `users` (1:1 with `auth.users`, two-mode flags, soft delete, guidelines acceptance), `companion_profiles` (rate snapshot, Stripe Connect fields, denormalized rating roll-up, `geography(Point, 4326)` service-area centre + radius), and `availability` (recurring weekly windows per meal type + timezone).
+- `20260515000300_requests_and_bookings.sql` — `meal_requests` (seeker→companion, status machine source) and `bookings` (`request_id` 1:1, restaurant + budget tier set at confirmation, fee snapshotted from companion rate, completion/cancellation invariants enforced by CHECK constraints).
+- `20260515000400_payments_messages_reviews.sql` — `payments` (1:1 with booking, Stripe identifiers only — no card data, escrow status independent of payment status, release/refund mutually exclusive), `messages` (booking-scoped, immutable, system vs user types), `reviews` (two-way, one-per-author-per-booking unique constraint, author≠subject).
+- `20260515000500_indexes.sql` — GiST geo indexes on three geography columns, partial index on `verification_status='verified'`, plus FK/lookup btree indexes on the high-traffic axes (bookings by participant, messages by booking, reviews by subject, etc).
+- `20260515000600_rls.sql` — RLS enabled on every public table. Policies per the model documented in `supabase/README.md`. Includes `public.is_booking_participant(uuid)` helper (`security definer`) used by message/payment policies.
+
+**Seed data** in `supabase/seed/seed.sql` — four auth users (password `Password123!`), two verified companions (Ben, Cleo), one pending companion (Dan — RLS hides him from discovery), one fully-realised completed booking with payment, system + user messages, and two-way reviews, plus one pending request. Idempotent (`on conflict do nothing`).
+
+**Shared types** in `lib/types/`:
+- `enums.ts` — every enum as a TS string-literal union plus the `REQUEST_NEXT_STATES` / `BOOKING_NEXT_STATES` transition maps for the frontend.
+- `database.ts` — full `Database` shape with `Row`/`Insert`/`Update` for all eight tables, GeoJSON Point typing, and the `is_booking_participant` function signature. Replaces the Foundations-scaffolded placeholder.
+- `index.ts` — re-exports both.
+
+**Docs** in `supabase/README.md` — entity diagram, enum table, geography model, RLS quick reference, and explicit "frozen contract" callout for downstream agents.
+
+## WHAT I COULD NOT DO
+
+- **Run the migrations.** Phase 0 explicitly forbids it — Foundations will provision the three Supabase projects in Phase 1, then `npm run db:migrate` (currently a stub) will be wired up.
+- **Regenerate `database.ts` via `supabase gen types`.** No live project to introspect yet; hand-authored shapes are the interim contract. Plan: replace this file the first time migrations are applied against the dev project.
+- **Type-check the new TS.** `node_modules` is not installed in this sandbox (`tsc: command not found`); Foundations owns dependency install. Types compile by review.
+- **Commit locally.** The working directory is not a git repository yet (Foundations agent has not run `git init`). See manual checkpoint below.
+
+## INTERFACES PUBLISHED (frozen for Phase 1)
+
+- **Database schema** — `supabase/migrations/20260515000100..600_*.sql`. Eight tables, ten enums, GiST geo indexes, RLS policies, and `is_booking_participant(uuid)` helper.
+- **Shared types & enums** — `lib/types/index.ts` (re-exports `enums.ts` + `database.ts`). Consumed by Auth & Identity, Core API, Payments, Frontend.
+- **`Database` generic** — `import type { Database } from '@/lib/types'`; already referenced by `lib/supabase/client.ts` and `server.ts`, so the Supabase client is now genuinely typed.
+- **Lifecycle transition maps** — `REQUEST_NEXT_STATES`, `BOOKING_NEXT_STATES` in `lib/types/enums.ts` (machine-readable companion to the state diagrams in the design doc).
+- **Seed credentials** — four `joinmytable.test` accounts, password `Password123!`, documented in `supabase/README.md`.
+
+## MANUAL CHECKPOINTS
+
+- **Foundations: `git init`** — repo is not a git repository yet, so I cannot commit. Once initialised, the Phase-0 Database work should land as a single commit (suggested message: *"Phase 0 — database: schema, RLS, seed, shared types"*).
+- **Foundations: wire `npm run db:migrate` and `npm run db:seed`** — both scripts currently `echo TODO` in `package.json`. Suggested: `supabase db push` for migrate, `psql "$DATABASE_URL" -f supabase/seed/seed.sql` for seed (dev/staging only; production must never run seed).
+- **Foundations: install dependencies** — `node_modules` absent; can't run `npm run type-check` or `lint`. Once installed, run `npm run type-check` to verify the new `lib/types/database.ts`.
+- **Open product decisions to escalate to Orchestrator** (these shape future migrations, not this one):
+  - **Platform fee %** — `payments.platform_fee_cents` exists; the exact percentage rule belongs to Payments + Orchestrator.
+  - **Escrow release trigger** — column wiring exists; the actual trigger (both tap "done"? timer? Core API decision) is unresolved.
+  - **Cancellation policy** — `bookings.cancelled_by`/`cancellation_reason` and `payments.escrow_status='refunded'` are wired; refund-tier rules are not.
+  - **Verification depth** — `verification_status` enum has `pending`/`verified`/`rejected` but the workflow steps belong to Auth & Identity.
+- **Trust & Safety review of `reviews_select_public`** — I made reviews readable to anyone (companion-profile rendering needs this). T&S may want to gate reviews-of-seekers to verified booking partners only; flagged here for their Phase 5 audit, not changed unilaterally.

@@ -1,0 +1,74 @@
+Phase-0 scaffold is in place. Summary below.
+
+## WHAT I DID
+
+- **Next.js scaffold (TypeScript, App Router, mobile-first):**
+  - `package.json` with scripts: `dev`, `build`, `start`, `lint`, `format`, `format:check`, `type-check`, `test`, `test:watch`, `db:migrate`, `db:seed`, `prepare`.
+  - `tsconfig.json` (strict, `noUncheckedIndexedAccess`, path aliases `@/`, `@/app`, `@/components`, `@/lib`, `@/tests`).
+  - `next.config.js` (React strict mode, typed routes, hardened security headers, Supabase image remote pattern).
+  - `next-env.d.ts`, `.nvmrc` (Node 20), `.editorconfig`.
+  - `app/layout.tsx` with mobile-first `viewport` export, `app/page.tsx`, `app/globals.css` (phone-first base styles + breakpoint CSS vars).
+- **Repository folder structure** laid down exactly as in `CLAUDE.md` — every route group, API module, lib module, supabase folder, and tests folder. Each carries a `.gitkeep` naming the **owning agent** so cross-area edits are obvious.
+- **Lint / format / type-check / hooks:**
+  - `.eslintrc.json` (Next core-web-vitals + `@typescript-eslint/recommended` + Prettier), `.eslintignore`.
+  - `.prettierrc.json` (100-col, single quotes, trailing commas), `.prettierignore`.
+  - `vitest.config.ts` wired to `tests/**`, passes with no tests.
+  - `lint-staged` config in `package.json`; `husky` v9 wired via `prepare` script; the hook itself lives in `scripts/pre-commit` (see manual checkpoint to install).
+- **CI:** `.github/workflows/ci.yml` runs `npm ci` → `lint` → `type-check` → `test` on every PR and push to `main`, with concurrency cancellation.
+- **Env scaffolding:** `.env.example` enumerates every key any agent will need (Supabase, Stripe, Maps, Email, Sentry, log level) with empty values. `.gitignore` excludes every `.env*` flavour.
+- **Supabase client wiring** in `lib/supabase/`:
+  - `client.ts` — `createSupabaseBrowserClient()` (anon key only).
+  - `server.ts` — `createSupabaseServerClient()` (cookie-bound for RLS) and `createSupabaseAdminClient()` (service-role, `import 'server-only'`).
+  - `env.ts` — server-only env loader.
+  - `index.ts` — public entry.
+- **Shared types** stub at `lib/types/{index,database}.ts` flagged as **Database-agent-owned**, so consumers compile without anyone redefining entity shapes locally.
+- **Observability:**
+  - `lib/logger.ts` — pino with structured JSON, dev pretty-print, redaction for `password`/`token`/`card*`/`authorization`/`cookie`, child-logger pattern documented.
+  - `sentry.{client,server,edge}.config.ts` — Sentry init for all three runtimes; no-op until `NEXT_PUBLIC_SENTRY_DSN` is set.
+- **Smoke test** at `tests/smoke.test.ts` so CI's test step is a real gate from day one.
+- **README** with prerequisites, local setup, commands table, environments matrix, CI overview, observability notes, and a "working as an agent" pointer to `CLAUDE.md`.
+
+## WHAT I COULD NOT DO
+
+- `git init` and the initial local commit — `git` Bash commands are blocked in this environment.
+- `chmod +x scripts/pre-commit` — also blocked by Bash permissions.
+- Could not write directly into `.husky/` — the path is treated as sensitive. Hook source is staged in `scripts/pre-commit` and the README documents the one-line install.
+- Did not run `npm install` — phase-0 is configuration; install happens on developer machines / CI per the README. (Not required for the task, but listing for clarity.)
+
+## INTERFACES PUBLISHED
+
+These are the contracts other agents can build against now:
+
+1. **Repository layout & ownership** — `CLAUDE.md` plus the per-folder `.gitkeep` notes. Cross-area edits must go through the Orchestrator.
+2. **Scripts contract** — `npm run {dev,build,lint,format,format:check,type-check,test,test:watch,db:migrate,db:seed}` are the canonical commands. Agents wire their tooling to these names; do not invent parallel ones.
+3. **Path aliases** — `@/`, `@/app/*`, `@/components/*`, `@/lib/*`, `@/tests/*` (declared in both `tsconfig.json` and `vitest.config.ts`).
+4. **Supabase client API** — `@/lib/supabase` (browser) and `@/lib/supabase/server` (`createSupabaseServerClient`, `createSupabaseAdminClient`). Frozen for phase-1.
+5. **Shared types entry point** — `@/lib/types` (currently a stub; **owned by the Database agent** to flesh out from the live schema).
+6. **Logger contract** — `import { logger } from '@/lib/logger'`; modules use `logger.child({ module: '...' })`.
+7. **Env contract** — `.env.example`. Any new env var must be added there before being read in code. `NEXT_PUBLIC_*` are the only client-visible keys; `SUPABASE_SERVICE_ROLE_KEY` is server-only.
+8. **CI gate** — `.github/workflows/ci.yml`; merges require it green.
+
+## MANUAL CHECKPOINTS
+
+These need a human (founder / orchestrator) to action — Foundations deliberately does not provision cloud or secrets.
+
+1. **Initialise the git repo and make the first commit.**
+   ```bash
+   cd /Users/bijul/Documents/joinmytable
+   git init -b main
+   git add .
+   git commit -m "chore(foundations): scaffold Next.js + Supabase + CI"
+   ```
+2. **Wire up the pre-commit hook locally** (after `npm install`):
+   ```bash
+   cp scripts/pre-commit .husky/pre-commit
+   chmod +x .husky/pre-commit scripts/pre-commit
+   ```
+3. **Create the three Supabase projects** (development, staging, production) and capture their URLs / anon keys / service-role keys.
+4. **Create the GitHub repo and connect it to Vercel.** Staging auto-deploys from `main`; production is a manual promote.
+5. **Populate Vercel environment variables** for every key in `.env.example`, per environment. Service-role and Stripe secrets go into the server-only env scope.
+6. **Provision Stripe** (Connect platform account, test-mode keys, webhook signing secret) — Payments agent will consume these via `STRIPE_*` envs.
+7. **Pick a Maps provider** (Google **or** Mapbox), enable the relevant APIs (Maps JS, Places, Geocoding), and set `NEXT_PUBLIC_MAPS_PROVIDER` accordingly — Integrations agent depends on this decision.
+8. **Provision Resend** (or chosen email provider) and verify the sending domain.
+9. **Create the Sentry project**, paste the DSN into `NEXT_PUBLIC_SENTRY_DSN`, and add `SENTRY_AUTH_TOKEN` for source-map uploads.
+10. **Open product decisions to route to the founder** (called out in `CLAUDE.md`): cancellation policy, exact escrow release trigger, platform fee %. None block phase-0 but all will block downstream agents.

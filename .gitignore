@@ -1,0 +1,51 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+coverage/
+
+# next.js
+.next/
+out/
+build/
+dist/
+
+# misc
+.DS_Store
+*.pem
+.vscode/
+.idea/
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (never commit real secrets)
+.env
+.env.local
+.env.development
+.env.development.local
+.env.staging
+.env.staging.local
+.env.production
+.env.production.local
+.env.test
+.env.test.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# turbo / build caches
+.turbo
+
+# supabase local
+supabase/.branches
+supabase/.temp
