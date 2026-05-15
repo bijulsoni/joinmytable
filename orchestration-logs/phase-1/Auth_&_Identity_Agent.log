@@ -1,120 +1,185 @@
 phase-1 / Auth & Identity Agent
 
+Phase-1 Auth & Identity work shipped in commit 55e1680 ("phase-1(auth):
+supabase auth, two-mode accounts, verification flow"). The Foundations
+re-pin in commit 3a6e048 brought the slice forward to Next 15 + ESLint 9
++ the async `cookies()` API and is still green here: `tsc --noEmit`
+passes, `eslint .` passes, the unit-test suite passes (50/50). This
+re-invocation re-audited the slice against the phase-1 task list and the
+CORE PRODUCT RULES; no new code changes were required.
+
 WHAT I DID
-- Built the auth screens under app/(auth)/: sign-up (screen 1) with email +
-  password, display name, mode select (seeker/companion), and guidelines
-  acceptance; login; forgot-password; reset-password; the Supabase OAuth
-  callback handler; a check-email landing for confirmation flows; and a
-  POST /logout route. Mobile-first styling via styles.module.css.
-- Wired Supabase Auth session handling: middleware.ts refreshes the
-  session cookie on every request; lib/auth/session.ts exposes
-  getSessionUser / requireSessionUser / requireMode for server code; the
-  client AuthProvider (lib/auth/context.tsx) is mounted in the root
-  layout so client components can read the session app-wide.
-- Implemented the one-account-two-modes model: sign-up captures both
-  flags, the public.users mirror row is upserted via the admin client,
-  app/(auth)/mode/ exposes a mode-switcher (server action calls
-  updateUserModes which enforces the "at least one mode" invariant
-  client-side AND defers to the schema check constraint).
-- Built the verification flow:
-  - Seeker (lighter): email confirmation (Supabase Auth) + guidelines
-    acceptance auto-promote users.seeker_verification_status to
-    'verified' via reconcileSeekerVerification (called from sign-up,
-    login, callback, and the accept-guidelines route).
-  - Companion (stronger): app/(auth)/verify/companion submits legal
-    name + an identity document. Document goes to a private
-    'verification' Storage bucket; companion_profiles.verification_status
-    moves to 'pending'. Admin-side transition to 'verified' is
-    intentionally out-of-scope (flagged below). RLS continues to enforce
-    that unverified companions are non-discoverable/non-bookable - core
-    product rule #9.
-- Implemented profile photo upload (lib/auth/storage.ts) with
-  server-side MIME + size validation, idempotent bucket provisioning,
-  and writeback of users.avatar_path. The AvatarUploader component is
-  surfaced in the verification hub.
-- Reflected auth state app-wide by wrapping children in <AuthProvider>
-  inside app/layout.tsx (resolves the initial session server-side).
+
+- **Re-audited** every file in the Auth & Identity owned area against
+  the phase-1 task list. Everything still maps cleanly:
+
+  - Supabase Auth (email/password) integrated via `@supabase/ssr` —
+    `lib/supabase/{client,server}.ts` (Foundations) + `middleware.ts`
+    (Auth) refreshes the session cookie on every request.
+  - Sign-up screen (screen 1), login, password reset, email-confirmation
+    callback, check-email landing, and logout under `app/(auth)/`.
+    Mobile-first via `app/(auth)/styles.module.css`. All forms are
+    server-action backed (`useFormState` + zod) so server-side
+    validation is the source of truth.
+  - One-account-two-modes captured at sign-up (both flags), persisted in
+    the `public.users` mirror row via the admin client, and editable in
+    `app/(auth)/mode/`. `lib/auth/profile.ts#updateUserModes` refuses to
+    clear both flags client-side, with the `users_at_least_one_mode`
+    check constraint as belt-and-braces in the DB.
+  - Verification flow — two intensities:
+    - **Seeker (lighter)**: email confirmation + community-guidelines
+      acceptance auto-promote `users.seeker_verification_status` to
+      `'verified'`. `lib/auth/verification.ts#reconcileSeekerVerification`
+      is called from sign-up, login, the email-confirmation callback,
+      and the `POST /verify/accept-guidelines` route, so the gate stays
+      eventually consistent.
+    - **Companion (stronger)**: `app/(auth)/verify/companion` collects
+      legal name + an identity document. The document goes to a private
+      `verification` Storage bucket; `companion_profiles.verification
+      _status` moves `unverified → pending`. The transition to
+      `'verified'` is reserved for the admin path and is intentionally
+      not exposed in any application surface (CORE PRODUCT RULE #9 —
+      enforced in the DB by `companion_profiles_select_verified` RLS,
+      audited in `supabase/migrations/20260515000600_rls.sql:119`).
+  - Profile photo upload — `lib/auth/storage.ts` validates MIME
+    (jpeg/png/webp/heic/heif) and size (≤5 MB avatars / ≤10 MB
+    verification docs) **server-side** (CORE PRODUCT RULE — server-side
+    authority). Buckets are provisioned idempotently via the admin
+    client; uploads are namespaced under `<userId>/…` so cross-user
+    writes can't escape their prefix; on success `users.avatar_path` is
+    updated.
+  - Client session is mirrored app-wide via the
+    `AuthProvider`/`useAuth` pair in `lib/auth/context.tsx`, mounted in
+    `app/layout.tsx`. The root layout resolves the initial session
+    server-side so the first paint already reflects logged-in/out
+    state; `onAuthStateChange` keeps it fresh.
+
+- **Verified the slice still builds under the Foundations fix** (commit
+  3a6e048 — Next 15 + ESLint 9 + async cookies). All Auth-owned
+  callsites that take a server Supabase client now `await
+  createSupabaseServerClient()` / `await authServerClient()`. Spot-
+  checked: `app/(auth)/{sign-up,login,logout,forgot-password,reset
+  -password}/actions.ts`, `app/(auth)/verify/{page.tsx,accept
+  -guidelines/route.ts,companion/page.tsx}`, `lib/auth/{profile,
+  verification,session,storage,db}.ts`.
+
+- **Re-confirmed the unverified-companion gate is enforced where it
+  must be.** Auth code never writes `verification_status = 'verified'`
+  itself (grep across `lib/auth` confirms this). Discovery enforcement
+  lives in DB RLS (`companion_profiles_select_verified`). Booking
+  enforcement is delegated to the Core API at request-creation time per
+  the RLS comment at `…_rls.sql:184`; that's not in Auth's scope but
+  the data layer Auth manages (the status column) is correct.
+
+- **Ran the gates that exist locally**: `npm run type-check` (clean),
+  `npm run lint` (clean), `npm run test:unit` (50/50 — includes the
+  QA-agent's mocked `requireAuth` / `requireCompanionMode` branch
+  coverage and the auth-touching profile validators).
 
 WHAT I COULD NOT DO
-- Could not actually run the dev server end-to-end - no Supabase
-  project is provisioned (Supabase URLs/keys are blank in .env.local
-  beyond placeholders). Type-check passes for all auth code; runtime
-  verification requires a live project.
-- Did not move companion_profiles.verification_status to 'verified' -
-  that requires the admin/review path (and ideally a third-party
-  identity provider like Stripe Identity or Persona). Out of scope for
-  Phase 1; the submission flow halts at 'pending'.
-- Did not introduce a Postgres trigger to mirror auth.users into
-  public.users automatically - that would be a Database-agent change.
-  The mirror row is created via the admin client from server actions
-  instead.
-- Did not address the pre-existing type-check failure in
-  lib/supabase/server.ts (cookies() became async in Next 16). The
-  Foundations agent owns that file; flagged under MANUAL CHECKPOINTS.
+
+- **End-to-end exercise the flow against a live Supabase project.** The
+  Supabase env still ships with placeholder URL/keys in `.env.local`
+  (the founder/Foundations own that), and `psql` + `DATABASE_URL` for
+  `npm run db:migrate` is not provisioned (same blocker the Database
+  agent records). The slice is verified by typecheck + unit tests + an
+  audit of the data-flow against the published schema; runtime
+  verification is a manual checkpoint.
+
+- **Admin-side companion verification ("pending → verified" /
+  "rejected").** Out of phase-1 scope. The submission flow halts at
+  `'pending'`; the admin review surface and any third-party identity
+  provider (Stripe Identity, Persona, Veriff) are a follow-up flagged
+  to the Orchestrator + Trust & Safety.
+
+- **Configure Supabase Auth project settings** (email templates,
+  redirect-URL allow-list, callback URLs, password policy). That's
+  dashboard config the agent sandbox can't touch — see MANUAL
+  CHECKPOINTS.
+
+- **Configure Storage bucket RLS** for `avatars` and `verification`.
+  Bucket creation is idempotent in `lib/auth/storage.ts`, but the
+  Database/Foundations agent owns Storage RLS policy authoring (e.g.
+  restrict `avatars` writes to the owning prefix; gate `verification`
+  reads to admins). Flagged below.
+
+- **No code changes** were necessary in this re-run. Phase-1 Auth was
+  already delivered in 55e1680 and adapted to Next 15 in 3a6e048. The
+  only artifact this run produces is this log + the commit recording
+  it.
 
 INTERFACES PUBLISHED
-- Server (import from '@/lib/auth/session'):
-    getSessionUser(): Promise<SessionUser | null>
-    requireSessionUser(redirectTo?: string): Promise<SessionUser>
-    requireMode(mode: 'seeker' | 'companion'): Promise<SessionUser>
-    type SessionUser { id, email, emailConfirmed, profile: UserRow|null }
-- Client (import from '@/lib/auth'):
-    <AuthProvider initialSession={Session|null}>
-    useAuth(): { session, isLoading, signOut() }
-- Server (import from '@/lib/auth/profile'):
-    createUserMirrorRow(input)
-    updateUserModes({ isSeeker, isCompanion })
-    acceptGuidelines()
-- Server (import from '@/lib/auth/verification'):
-    submitCompanionVerification({ legalName, documentPath })
-    reconcileSeekerVerification(userId)
-- Server (import from '@/lib/auth/storage'):
-    uploadAvatar(blob), uploadVerificationDocument(blob),
-    avatarPublicUrl(path),
-    constants AVATAR_BUCKET = 'avatars', VERIFICATION_BUCKET = 'verification'
-- HTTP surface (Auth & Identity owned):
-    GET  /sign-up, /login, /forgot-password, /reset-password,
-         /check-email, /verify, /verify/companion, /mode
-    POST /logout
-    POST /verify/accept-guidelines
-    GET  /callback?code=...&next=... (Supabase email/PKCE exchange)
+
+Re-published (unchanged since 55e1680, still frozen):
+
+- **Server, `@/lib/auth/session`**
+  - `getSessionUser(): Promise<SessionUser | null>`
+  - `requireSessionUser(redirectTo?: string): Promise<SessionUser>`
+  - `requireMode(mode: 'seeker'|'companion', redirectTo?: string): Promise<SessionUser>`
+  - `type SessionUser = { id, email, emailConfirmed, profile: UserRow | null }`
+- **Client, `@/lib/auth`**
+  - `<AuthProvider initialSession={Session|null}>` (mounted in `app/layout.tsx`)
+  - `useAuth(): { session, isLoading, signOut() }`
+- **Server, `@/lib/auth/profile`**
+  - `createUserMirrorRow(input)`
+  - `updateUserModes({ isSeeker, isCompanion })`
+  - `acceptGuidelines()`
+- **Server, `@/lib/auth/verification`**
+  - `submitCompanionVerification({ legalName, documentPath })`
+  - `reconcileSeekerVerification(userId)`
+- **Server, `@/lib/auth/storage`**
+  - `uploadAvatar(blob)`, `uploadVerificationDocument(blob)`,
+    `avatarPublicUrl(path)`
+  - Constants: `AVATAR_BUCKET = 'avatars'`, `VERIFICATION_BUCKET = 'verification'`
+- **HTTP surface** (Auth & Identity owned)
+  - GET `/sign-up`, `/login`, `/forgot-password`, `/reset-password`,
+    `/check-email`, `/verify`, `/verify/companion`, `/mode`
+  - POST `/logout`
+  - POST `/verify/accept-guidelines`
+  - GET `/callback?code=...&next=...` (Supabase email/PKCE exchange)
 
 MANUAL CHECKPOINTS
-- Storage buckets: lib/auth/storage.ts auto-creates 'avatars' (public)
-  and 'verification' (private) buckets via the service role on first
-  upload, but Storage RLS policies for these buckets should be
-  configured by the Database/Foundations agent (e.g. restrict 'avatars'
-  writes to the owning user's path prefix; restrict 'verification'
-  reads to admins). Auto-creation also depends on
-  SUPABASE_SERVICE_ROLE_KEY being set.
-- Email confirmation / redirect URLs: the Supabase project Auth
-  settings need the app URL added to the allow-list
-  (NEXT_PUBLIC_APP_URL), and the email templates should point to
-  /callback?code={code}&next=... for sign-up and
-  /callback?code={code}&next=/reset-password for password reset.
-  Configured in the Supabase dashboard - I did not modify project
-  config.
-- Identity verification provider: companion verification currently
-  ends at 'pending' and an admin must move the row to 'verified' (or
-  'rejected'). Wiring this to a real ID-check vendor (Stripe Identity,
-  Persona, Veriff) is a follow-up product decision - flagging it for
-  the Orchestrator and Trust & Safety review.
-- Pre-existing type-check failures owned by Foundations:
-    lib/supabase/server.ts uses synchronous `cookies()`, which became
-    async in Next 16 (installed version is 16.2.6, package.json pins
-    14.2.18 - the lockfile is ahead). The auth code is unaffected at
-    runtime, but `npm run type-check` will report 3 errors against
-    that file until Foundations rewrites the cookie adapter as async.
-- Pre-existing lint failure owned by Foundations:
-    `next lint` was removed in Next 15+; `npm run lint` now errors
-    out with "Invalid project directory provided". Needs to switch to
-    `eslint .` or the new lint integration.
-- Database type regeneration (Database agent): the hand-authored
-  `Database` shape in lib/types/database.ts no longer satisfies
-  supabase-js 2.105's `GenericSchema` constraints
-  (`Views: Record<string, never>` collapses every table to `never` in
-  query inference). The auth module uses local typed adapters
-  (lib/auth/db.ts) and projects results into the published Row types
-  to work around this. Removing the adapters is a one-line change
-  once Foundations regenerates the type via `supabase gen types
-  typescript`.
+
+For the Orchestrator / Foundations / founder:
+
+1. **Provision Supabase project envs.** `.env.local` still ships
+   placeholders for `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+   Until those point at a real project, none of the auth flows can be
+   exercised end-to-end. (Same blocker the Database and Core-API
+   agents flagged.)
+
+2. **Supabase Auth dashboard configuration** (owner: founder /
+   Foundations — can't be done from code):
+   - Add `NEXT_PUBLIC_APP_URL` to the redirect-URL allow-list.
+   - Point the sign-up confirmation template at
+     `/callback?code={code}&next=/verify`.
+   - Point the password-reset template at
+     `/callback?code={code}&next=/reset-password`.
+   - Confirm the email-confirmation policy matches what `signUpAction`
+     assumes: if a session is returned from `signUp` we redirect to
+     `/verify`; otherwise to `/check-email`.
+
+3. **Storage bucket RLS** (owner: Database agent). The Auth slice
+   provisions `avatars` (public) and `verification` (private) buckets
+   idempotently, but the RLS policies on `storage.objects` for those
+   buckets are not yet authored. Recommended:
+   - `avatars`: insert/update gated to `name LIKE auth.uid() || '/%'`;
+     select public.
+   - `verification`: insert gated to `name LIKE auth.uid() || '/%'`;
+     select restricted to a future admin role.
+
+4. **Admin review surface for companion verification.** The submission
+   flow ends at `'pending'`; moving rows to `'verified'` / `'rejected'`
+   is admin-only and not part of phase-1. Open product decisions:
+   which third-party identity vendor (if any), and what the admin
+   tool looks like. Flagged to Trust & Safety.
+
+5. **Live verification of every auth flow** (owner: QA). The
+   integration-test scaffolding the QA agent landed in e2484bf is
+   ready to cover this once a disposable `TEST_SUPABASE_*` project is
+   provisioned. Recommended phase-2 coverage: sign-up → mirror row →
+   `/verify`; login + `reconcileSeekerVerification`; companion
+   submission → `verification_status='pending'`; avatar upload → MIME
+   reject path; unverified companion non-discoverable through
+   `companion_profiles_select_verified`.
