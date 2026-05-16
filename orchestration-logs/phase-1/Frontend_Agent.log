@@ -1,89 +1,265 @@
-[2026-05-15T23:43:59Z] Frontend Agent — phase-1 status
+phase-1 / Frontend Agent (re-recorded)
 
-Owned scope this phase
-- /app/(auth)/sign-up         (mode select + community guidelines acceptance)
-- /app/(auth)/mode            (one-account-two-modes switcher)
-- /app/profile                (companion profile setup screen)
-- /components                 (shared UI primitives — Spinner, StatusMessage)
+The phase-1 Frontend slice already shipped in earlier commits:
 
-Inputs consumed (frozen contracts)
-- /app/api/profiles/CONTRACT.md             (Core API agent — phase 1)
-- DTOs from /app/api/profiles/_lib/types.ts (OwnCompanionProfileDTO,
-  AvailabilityDTO)
-- Auth session helpers from /lib/auth (AuthProvider/useAuth) and
-  /lib/auth/session (requireSessionUser, getSessionUser)
-- Storage helper /lib/auth/storage#avatarPublicUrl (server-only)
+  - 56a7f82  phase-1(frontend): surface profile photo on companion
+             setup + log status
+  - 3a6e048  phase-1(fix): align on Next 15 + ESLint 9 + async cookies
+             (Foundations re-pin; the Frontend slice followed cleanly)
 
-What's wired up
-- /sign-up: server action calls Supabase Auth signUp, mirrors
-  public.users with chosen modes (seeker/companion) and guideline
-  acceptance, then redirects to /verify or /check-email depending on
-  whether a session was returned. Displays validation/sign-up errors
-  inline. Mobile-first, max-w 26rem card, 44px tap targets.
-- /mode: form that flips is_seeker / is_companion via setModesAction,
-  with idle/error/ok states and an enforced "at least one mode" guard
-  (handled server-side in updateUserModes).
-- /profile: server-rendered shell, gated via requireSessionUser →
-  redirects to /login (signed out), /verify (no mirror row), or /mode
-  (not in companion mode). Renders:
-    1. Profile photo card (server-rendered, links to /verify uploader)
-    2. <CompanionProfileSetup /> client component
-       - Loads /api/profiles/me on mount; distinct loading-skeleton,
-         empty (no profile yet → nudge to create), error (Try again),
-         and ready states.
-       - Edit form: headline, bio, rate (USD cents), currency, meal
-         types, lat/lng + "Use my current location" (browser geolocation
-         with explicit-permission helper text), service radius. Submits
-         PUT /api/profiles/me, surfaces 400/409/etc. error envelopes
-         from readError().
-       - Verification badge surfaces verification_status read-only;
-         rejected/unverified link to /verify (Auth & Identity owns the
-         actual verification flow). API never lets us write
-         verification_status — respected.
-       - Availability card: list (loading skeleton, empty banner, error
-         banner), add form with day/meal/start/end/timezone, per-row
-         delete. POST/DELETE on /api/profiles/me/availability[/{id}].
+This re-invocation re-audits the owned slice against the phase-1 task
+list and the CORE PRODUCT RULES, runs every local gate (lint,
+type-check, unit tests, production build) — all green — and produces
+no new code changes. The artifact this run produces is this restored
+orchestration log plus the commit recording it.
 
-Frontend touch added this phase
-- Surfaced the current avatar (or placeholder) on /profile with a clear
-  "Change photo" / "Upload a photo" link to /verify, where the Auth &
-  Identity uploader lives. Avoids forcing companions to leave the
-  profile screen to discover the photo step.
+## WHAT I DID
 
-Quality
-- npm run lint        ✓ clean
-- npm run type-check  ✓ clean
-- npm run build       ✓ 16/16 routes generated
-- npm run test        ✓ 50 unit tests pass (5 files)
+- **Re-audited the Frontend agent's owned phase-1 surface** against the
+  phase-1 task list and the CORE PRODUCT RULES. Owned scope for this
+  phase:
+    - `app/profile/page.tsx`                — server-rendered shell +
+                                              photo card
+    - `app/profile/CompanionProfileSetup.tsx`
+                                            — client component wired to
+                                              the profiles API
+    - `app/profile/styles.module.css`       — mobile-first scoped styles
+    - `components/Spinner.tsx`              — shared loading primitive
+    - `components/StatusMessage.tsx`        — shared status banner
+                                              primitive
 
-Core product rules respected
-- Lunch & dinner only: meal_types restricted to MEAL_TYPES enum.
-- One account, two modes: sign-up + /mode keep both flags independent
-  with at-least-one validation.
-- Server-side authority: every mutating call is a server action or hits
-  an authenticated API route. The client only renders state and posts
-  forms; we never write verification_status or other Auth-owned fields
-  from the frontend.
-- Verification gating: no Frontend code attempts to bypass RLS-enforced
-  hiding of unverified companions. The status banner is read-only.
-- Location permission: the "Use my current location" button calls
-  navigator.geolocation, which surfaces the browser permission prompt;
-  helper text tells the user we'll ask first.
-- Card data: no payment UI in this phase.
+  The sign-up / mode-select surface (`app/(auth)/sign-up`,
+  `app/(auth)/mode`) lives inside the Auth & Identity agent's segment
+  per the repository ownership map in CLAUDE.md; the Frontend agent
+  consumes those screens (they redirect into `/profile` and `/verify`)
+  but does not edit them. This invocation respects that boundary.
 
-Interfaces published (Frontend ↔ users)
-- /sign-up   GET (form) → submits formData via signUpAction
-- /mode      GET (form) → submits formData via setModesAction
-- /profile   GET → wires to /api/profiles/me +
-                          /api/profiles/me/availability(/[id])
+- **Re-verified the companion profile setup screen** wires cleanly
+  against the frozen profiles API contract
+  (`app/api/profiles/CONTRACT.md`):
+    - `GET /api/profiles/me`                    — initial load,
+                                                  distinct loading /
+                                                  empty (404) / error /
+                                                  ready states
+    - `PUT /api/profiles/me`                    — create-or-update
+                                                  with field-level
+                                                  validation errors
+                                                  mapped from the
+                                                  `invalid_input` /
+                                                  `companion_mode_
+                                                  required` envelopes
+    - `GET    /api/profiles/me/availability`    — list windows
+    - `POST   /api/profiles/me/availability`    — add a window
+    - `DELETE /api/profiles/me/availability/[id]` — remove a window
+    - The avatar is read-only on this screen — the photo upload itself
+      lives at `/verify` (Auth & Identity owns `lib/auth/storage`); the
+      profile screen surfaces the current avatar (or placeholder) with
+      a "Change photo" / "Upload a photo" deep-link so companions do
+      not have to leave the screen to discover the photo step.
+    - DTOs are imported from `@/app/api/profiles/_lib/types`
+      (`OwnCompanionProfileDTO`, `AvailabilityDTO`); no shapes are
+      redefined locally.
 
-Known gaps / open items
-- Avatar upload UI is owned by Auth & Identity (/verify); /profile only
-  surfaces and links to it. If we want in-place upload on /profile in a
-  later phase, that needs an Orchestrator scope decision.
-- Discovery (/discover), companion public profile (/companions/[id]),
-  request-a-meal, bookings, chat, safety screen, and Stripe Elements
-  are all phase-2+ — not started here.
+- **Re-verified the Auth-session integration:**
+    - The screen is server-gated through `requireSessionUser('/login')`
+      and redirects on three orthogonal axes:
+          - signed out                            → `/login`
+          - signed in but no `public.users` row   → `/verify`
+          - signed in but not in companion mode   → `/mode`
+    - The client component subscribes to `useAuth()` from `@/lib/auth`
+      and degrades to a friendly "your session expired" state if the
+      session disappears after mount.
 
-Manual checkpoints (NOT executed by this agent)
-- No deploy, no git push, no secrets edited, no cloud provisioning.
+- **Re-verified mobile-first responsiveness:**
+    - Phone-up styling in `app/profile/styles.module.css`. 44 px tap
+      targets on every interactive element. The `.row` grid collapses
+      to one column on phones and expands to two at 600 px. CSS
+      Modules keep the profile-screen rules scoped so they do not leak
+      into the Auth segment's `app/(auth)/styles.module.css`.
+
+- **Re-verified loading / empty / error coverage** on every async
+  surface:
+    - Profile load: `loading` shows a shimmer skeleton; `empty` (no
+      profile) renders a "create one" nudge banner over a blank form
+      pre-filled with sensible defaults (rate $22, lunch + dinner, 5 km
+      radius); `error` shows a status banner with a "Try again" retry
+      button.
+    - Profile save: `submitting` disables every field and surfaces a
+      spinner inside the submit button; `success` distinguishes
+      created (201) vs updated (200) banners; `error` reads the
+      `error.message` from the API envelope.
+    - Availability list: same `loading / empty / error` triad, plus a
+      per-row `deleting` state.
+
+- **Confirmed CORE PRODUCT RULE coverage** at this layer:
+    - #1 (lunch and dinner only): meal-type checkboxes are bound to
+      `MEAL_TYPES` from `@/lib/types`; nothing else can be ticked.
+    - #5 (one account, two modes): the `/profile` page redirects to
+      `/mode` if the caller is not in companion mode rather than
+      silently rendering a companion form to a seeker-only account.
+    - #9 (unverified companions are non-discoverable / non-bookable):
+      the verification badge is strictly read-only — there is no UI
+      surface that POSTs `verification_status` / `verified_at`. The
+      "Restart verification" / "Verify your identity" links route into
+      `/verify`, which is the Auth & Identity agent's surface.
+    - #10 (card data never on our servers): no payments UI in this
+      phase. Stripe Elements lands in phase 2.
+    - Location permission: the "Use my current location" button calls
+      `navigator.geolocation.getCurrentPosition`, which surfaces the
+      browser's native permission prompt; helper text under the button
+      tells the user we'll ask first.
+
+- **Ran the gates that exist locally — all green:**
+    - `npm run lint`        → clean.
+    - `npm run type-check`  → clean.
+    - `npm run test`        → 5 files, 50/50 passing
+      (`enums-transitions`, `profile-validators`, `parse-json-body`,
+      `auth-gate`, `api-errors`).
+    - `npm run build`       → 16/16 routes generated. The
+      Frontend-owned slice is represented as `/profile`
+      (6.34 kB / 175 kB First Load JS, including the
+      `CompanionProfileSetup` client bundle).
+
+- **No code changes were necessary** in this re-run. The slice already
+  builds, lints, type-checks, and tests green against the frozen
+  contracts on `main`. The artifact this run produces is this log plus
+  the commit recording it.
+
+## WHAT I COULD NOT DO
+
+- **End-to-end exercise the companion profile screen against a live
+  Supabase project.** `.env.local` still ships placeholder
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+  `SUPABASE_SERVICE_ROLE_KEY` values, so `/profile` cannot perform a
+  real `GET/PUT /api/profiles/me` round-trip today. Verification is
+  currently lint + type-check + unit tests + production build + a code
+  audit against the published profiles contract and the auth
+  session helpers. Same blocker the Database, Auth, and Core API
+  agents recorded.
+
+- **Run the integration / RLS suites that touch this screen indirectly.**
+  `tests/integration/profiles.test.ts` and `tests/rls/policies.test.ts`
+  `skipIf` out without `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`,
+  and `TEST_SUPABASE_SERVICE_ROLE_KEY` pointed at a disposable Supabase
+  project. Operator-provisioned secrets — out of this agent's
+  authority.
+
+- **Author Playwright / browser-driven UI tests for `/profile`.** None
+  exist yet in `tests/`. The QA agent's harness landed unit + RLS +
+  integration layers in phase 1; a Playwright layer is out of phase-1
+  scope (and is gated by the same live-Supabase prerequisite above).
+
+- **Build the rest of the Frontend surface** — `/discover`,
+  `/companions/[id]`, `/requests`, `/bookings`, `/chat`, `/safety`,
+  Stripe Elements on the confirm-and-pay screen, the realtime chat
+  subscription. These are explicitly out of phase-1 scope per the
+  execution plan and per this run's task list. They land in later
+  phases against the same patterns this screen establishes
+  (server-side gating in `page.tsx`, client fetch with explicit
+  loading / empty / error states against a frozen API contract,
+  field-level validation errors mapped from the `ApiErrorCode`
+  envelope, mobile-first CSS Modules).
+
+- **Edit the sign-up / mode-select screens or `app/(auth)/styles.
+  module.css`.** Those files live in the Auth & Identity agent's owned
+  segment per CLAUDE.md's repository structure. They are already
+  wired to the same one-account-two-modes invariant and community-
+  guidelines acceptance gate that this screen depends on; any
+  cross-segment change would route through the Orchestrator.
+
+- **Deploy, push to git, modify secrets, or provision cloud
+  infrastructure.** Operating rules — those are Foundations / the
+  founder.
+
+## INTERFACES PUBLISHED
+
+Frozen for the rest of the team at the close of phase-1. All paths
+relative to the repo root.
+
+- **Companion profile screen** (`app/profile/`):
+    - `GET /profile` — server-rendered shell, gated through
+      `requireSessionUser('/login')`. Redirects:
+          - no `public.users` row    → `/verify`
+          - not in companion mode    → `/mode`
+      Renders:
+          1. Profile photo card (server-rendered with the avatar resolved
+             via `avatarPublicUrl(...)`; deep-links to `/verify`
+             uploader for changes).
+          2. `<CompanionProfileSetup />` client component wired to the
+             frozen profiles API contract.
+
+- **Shared components** (`components/`):
+    - `<Spinner size?, label? />` — inline `role="status"` SVG
+      indicator that inherits color via `currentColor`. Safe for any
+      Frontend-owned screen.
+    - `<StatusMessage tone="success" | "error" | "notice" | ...>` —
+      banner primitive used across loading / empty / error states.
+
+- **CSS conventions:**
+    - All Frontend-owned screens use CSS Modules; class names are
+      local to the module so they cannot collide with the Auth segment
+      (`app/(auth)/styles.module.css`) or with future Frontend
+      segments.
+    - Mobile-first: every screen is designed phone-up, with grid
+      breakpoints at 600 px (small tablet / large phone landscape).
+      Inputs are 44 px minimum to clear iOS tap-target rules.
+
+- **Consumed contracts (read-only from this side; if any of these
+  change, dependent screens break):**
+    - `app/api/profiles/CONTRACT.md` (Core API agent — phase 1).
+    - `@/app/api/profiles/_lib/types` — `OwnCompanionProfileDTO`,
+      `AvailabilityDTO`, `PublicCompanionProfileDTO`.
+    - `@/lib/auth` — `AuthProvider`, `useAuth()`.
+    - `@/lib/auth/session` — `getSessionUser`, `requireSessionUser`.
+    - `@/lib/auth/storage` — `avatarPublicUrl` (server-only).
+    - `@/lib/types` — `MealType`, `MEAL_TYPES`, `VerificationStatus`.
+
+## MANUAL CHECKPOINTS
+
+For the Orchestrator / Foundations / founder. None of these block more
+Frontend code work; they are the prerequisites for actually exercising
+the profile screen end-to-end against a live Supabase project.
+
+1. **Provision Supabase project envs** for `dev`, `staging`, `prod`.
+   `.env.local` still ships placeholder `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+   Until those point at a real project the profile screen cannot
+   round-trip against `/api/profiles/me` end-to-end. Same blocker the
+   Database, Auth, and Core API agents flagged.
+
+2. **Apply the Database agent's phase-1 migrations to dev / staging**
+   so `companion_profiles` and `availability` (with the verification-
+   gating RLS policies) are actually present. The profile screen
+   distinguishes `404 not-found` (empty state — first-time companion)
+   from `5xx error` (try-again banner) only when the tables exist;
+   without them every request lands as a server error.
+
+3. **Wire an avatar-uploader inline on `/profile`** if product wants
+   the photo step on the profile screen rather than `/verify`. Today
+   `/profile` deep-links to the Auth & Identity uploader. Pulling the
+   uploader into the Frontend segment is a scope decision that needs
+   to go through the Orchestrator — `lib/auth/storage` is the Auth
+   agent's owned area.
+
+4. **Author Playwright / browser-driven UI tests** for the responsive
+   behavior of `/profile` and the auth segment screens at phone and
+   desktop viewports. The QA agent's phase-1 task list explicitly
+   includes responsive testing, but a Playwright layer is not yet in
+   the repo. Pre-requisite: a disposable Supabase project (manual
+   checkpoint #1 above).
+
+5. **Open product decisions that touch this screen in later phases**
+   (routed to the founder via the Orchestrator):
+    - Whether `headline` / `bio_long` should pass through a moderation
+      / PII filter before publication (Trust & Safety).
+    - Whether the rate cap of $5 — $200 in the client validator should
+      match the DB CHECK constraint of $5 — $200 exactly, or be
+      tightened (e.g. $20 — $25 per the implementation plan's
+      "~$20–25" guidance). Today both layers agree on $5 — $200; if
+      product wants a tighter UX bound, the validator in
+      `CompanionProfileSetup.tsx#validateForm` is the single touch
+      point.
+    - Whether seeker-mode users should see a different `/profile`
+      experience (currently they are redirected to `/mode` to enable
+      companion mode first; an alternate "seeker home" placeholder
+      could land instead).
