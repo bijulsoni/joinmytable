@@ -13,7 +13,8 @@ supabase/
 │   ├── 20260515000300_requests_and_bookings.sql      # meal_requests, bookings
 │   ├── 20260515000400_payments_messages_reviews.sql  # payments, messages, reviews
 │   ├── 20260515000500_indexes.sql                    # geo + lookup indexes
-│   └── 20260515000600_rls.sql                        # Row Level Security
+│   ├── 20260515000600_rls.sql                        # Row Level Security (public schema)
+│   └── 20260515010000_storage_rls.sql                # Row Level Security (storage.objects)
 ├── seed/
 │   └── seed.sql                         # Dev + staging sample data
 └── README.md                            # This file
@@ -97,6 +98,21 @@ Status-transition rules (e.g. only the companion may move a request to
 enforced in the **Core API** and **Payments** layers, not in RLS. RLS is
 the last-line authorization fence; the API is the rules enforcer (per
 `CLAUDE.md`).
+
+### Storage (storage.objects)
+
+Two buckets are owned by the Auth & Identity agent and fenced here:
+
+| Bucket         | Public | SELECT     | INSERT / UPDATE / DELETE                    |
+| -------------- | ------ | ---------- | ------------------------------------------- |
+| `avatars`      | yes    | anyone     | owner only — object key must start `<uid>/` |
+| `verification` | no     | owner only | owner only — object key must start `<uid>/` |
+
+Service-role uploads (used by `lib/auth/storage.ts`) bypass RLS by
+design; these policies fence direct anon/JWT access so a compromised
+bearer token can never escape its prefix or read another user's
+identity document. An admin-review SELECT branch on `verification` will
+be added once a dedicated admin role exists (Trust & Safety phase).
 
 ## Running migrations + seed
 
@@ -196,10 +212,14 @@ reachable with a single signed-in client.
 As of the close of Phase 1, the following are **frozen** and consumed
 by Auth & Identity, Core API, and Payments:
 
-- Migration set: `supabase/migrations/20260515000100..600_*.sql` — eight
-  tables, ten enums, GiST geo indexes on three `geography(Point, 4326)`
-  columns, RLS enabled on every public table, and the
-  `public.is_booking_participant(uuid)` helper.
+- Migration set:
+  - `supabase/migrations/20260515000100..600_*.sql` — eight tables, ten
+    enums, GiST geo indexes on three `geography(Point, 4326)` columns,
+    RLS enabled on every public table, and the
+    `public.is_booking_participant(uuid)` helper.
+  - `supabase/migrations/20260515010000_storage_rls.sql` — `avatars`
+    and `verification` bucket creation + the `storage.objects` RLS
+    policies described under _Storage_ above.
 - Enum values: `lib/types/enums.ts` (string-literal unions + transition maps).
 - TypeScript row/insert/update shapes: `lib/types/database.ts`.
 - The `Database` generic for `createClient<Database>()` — already
@@ -209,6 +229,10 @@ by Auth & Identity, Core API, and Payments:
 - Runner contract: `npm run db:migrate` and `npm run db:seed`
   (`scripts/db/{migrate,seed}.sh`) — accept `DATABASE_URL`,
   idempotent, `APP_ENV=production` blocks seed.
+- Verifier: `scripts/db/verify.sql` — asserts extensions, enums, tables,
+  RLS, GiST geo indexes, the `is_booking_participant` helper, the core
+  RLS policies, and (when the `storage` schema is present) the storage
+  bucket policies.
 
 Any change after this point goes through the Orchestrator and is
 versioned with a **new** migration file — never an edit to a

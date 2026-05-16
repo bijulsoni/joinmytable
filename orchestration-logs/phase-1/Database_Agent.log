@@ -1,146 +1,263 @@
-Phase 1 — Database agent summary.
+phase-1 / Database Agent
 
-The Phase 0 migration set, RLS policies, GiST geo-indexes, seed data, and
-shared types were authored at the close of Phase 0 (see
-orchestration-logs/phase-0/Database_Agent.log) and have not drifted in
-Phase 1. Three downstream agents have already shipped against the frozen
-contract on this branch — Auth & Identity, Core API (profiles), and the
-QA test harness (which authored an RLS suite that targets these exact
-policies) — none of which required any schema change.
+The Phase 0 migration set (20260515000100..600) was already finalized,
+idempotent, and published as the frozen contract in
+`supabase/README.md`. Phase 1 of the Database slice ships one new
+migration (storage RLS), updates the post-migrate verifier, and locks
+the schema as the v1 contract. The "apply migrations to dev/staging"
+and "seed dev" steps are blocked by environmental prerequisites (no
+`psql` on PATH, no `DATABASE_URL` provisioned in `.env.local`) and are
+recorded under MANUAL CHECKPOINTS with the exact incantations to run.
 
 ## WHAT I DID
 
-- **Re-reviewed the migration set** in `supabase/migrations/` and
-  confirmed every file is idempotent and unchanged since Phase 0:
-  `20260515000100_init.sql` (extensions + 10 enums + `set_updated_at`),
-  `…000200_users.sql`, `…000300_requests_and_bookings.sql`,
-  `…000400_payments_messages_reviews.sql`, `…000500_indexes.sql`,
-  `…000600_rls.sql`. All `create … if not exists` / `do $$ … $$` enum
-  guards / `drop policy if exists` in place; the same files will apply
-  cleanly across dev, staging, and (eventually) production.
-- **Geo-indexes verified statically.** Three PostGIS GiST indexes are
-  declared on the geography columns:
-  - `companion_profiles_service_area_gix` on
-    `companion_profiles.service_area_center`
-  - `bookings_restaurant_location_gix` on `bookings.restaurant_location`
-  - `meal_requests_proposed_location_gix` on
-    `meal_requests.proposed_location`
-  `scripts/db/verify.sql` already asserts (a) all three exist and (b)
-  the companion service-area index is actually GiST (not btree).
-- **Confirmed the frozen schema contract is intact.** No edits to
-  `supabase/migrations/*`, `supabase/seed/seed.sql`,
-  `lib/types/enums.ts`, or `lib/types/database.ts` in Phase 1.
-  Phase 0's "Frozen contract (Phase 1)" section in
-  `supabase/README.md` is still accurate. Downstream agents (Auth,
-  Core API, QA) have consumed it without requesting changes.
-- **Validated RLS policy authorship against the published model.** The
-  policies in `…000600_rls.sql` match the published quick-reference in
-  `supabase/README.md` and the QA agent's RLS suite
-  (`tests/rls/policies.test.ts`) targets them clause-for-clause. Once
-  run against a live database, the suite is the executable proof; it
-  self-skips today because `TEST_SUPABASE_*` env vars are not set.
+- **Re-audited the Phase 0 migrations** against the phase-1 task list
+  and the CORE PRODUCT RULES:
+  - All eight entities present and idempotent
+    (`create … if not exists`, `do $$ … $$` enum guards,
+    `drop policy if exists`).
+  - All ten enums in place; status fields constrained to enum types per
+    CLAUDE.md's "Status fields are enums" rule.
+  - PostGIS GiST geo indexes declared on the three
+    `geography(Point, 4326)` columns:
+    - `companion_profiles_service_area_gix`
+      (`companion_profiles.service_area_center`)
+    - `bookings_restaurant_location_gix`
+      (`bookings.restaurant_location`)
+    - `meal_requests_proposed_location_gix`
+      (`meal_requests.proposed_location`)
+    Plus the partial `companion_profiles_verified_idx` for the discovery
+    fast-path and btree indexes on the FK/lookup axes
+    (`availability`, `meal_requests`, `bookings`, `messages`, `reviews`,
+    `payments`). See `supabase/migrations/20260515000500_indexes.sql`.
+  - RLS enabled on every `public` table; policies cover the access
+    model documented in `supabase/README.md`. The
+    `public.is_booking_participant(uuid)` `security definer` helper
+    backs the `payments` / `messages` policies. See
+    `supabase/migrations/20260515000600_rls.sql`.
+  - Seed data is hermetic (fixed UUIDs, `on conflict do nothing`) and
+    sized to exercise the canonical access matrix from the README
+    (verified companion → discoverable; unverified Dan → hidden;
+    completed booking with payment, system + user messages, and
+    two-way reviews; one pending request to test the `requested`
+    state). See `supabase/seed/seed.sql`.
+
+- **Authored a new migration for Storage RLS** —
+  `supabase/migrations/20260515010000_storage_rls.sql`. Closes the gap
+  flagged by the Auth & Identity (#3) and Core API (#4) agents in their
+  Phase 1 manual checkpoints. Idempotent (`drop policy if exists` +
+  `insert … on conflict do nothing` for the bucket rows).
+  - `avatars` bucket: row created with `public = true`. `SELECT` public;
+    `INSERT` / `UPDATE` / `DELETE` gated to objects under
+    `<auth.uid()>/`. Matches the `<userId>/avatar-<ts>.<ext>` convention
+    used by `lib/auth/storage.ts#uploadAvatar`.
+  - `verification` bucket: row created with `public = false`. `SELECT`
+    and `INSERT` / `DELETE` restricted to the owner's prefix; no
+    `UPDATE` policy (identity documents are write-once). The future
+    admin-review surface will run with the service role until a
+    dedicated admin database role exists — flagged inline in the
+    migration and below for Trust & Safety.
+
+- **Extended `scripts/db/verify.sql`** with a spot-check for the new
+  storage policies. Guarded by `if exists (… nspname = 'storage') …` so
+  the verifier still works against a plain Postgres without the
+  Supabase `storage` schema. Updated the final NOTICE accordingly.
+
+- **Updated `supabase/README.md`** to lock the v1 contract:
+  - Listed the new `20260515010000_storage_rls.sql` migration in the
+    layout.
+  - Added a `Storage (storage.objects)` table to the RLS reference,
+    documenting per-bucket SELECT/INSERT/UPDATE/DELETE rules.
+  - Added the storage migration and `scripts/db/verify.sql` to the
+    "Frozen contract (Phase 1)" section.
+
+- **No changes to `lib/types/` or to any agent's owned code.** The
+  hand-authored `database.ts` / `enums.ts` already match the published
+  schema (and will be regenerated with `supabase gen types typescript`
+  the first time migrations land against the dev project — flagged
+  below). No public-schema migration was changed; the v1 surface
+  remains exactly what was published at the close of Phase 0.
 
 ## WHAT I COULD NOT DO
 
-- **Run `npm run db:migrate` against dev or staging.** Both prerequisites
-  documented in `supabase/README.md` are absent locally:
-  1. `psql` is not installed on this machine (`which psql` → not found).
-  2. `DATABASE_URL` is not exported and the project's `.env.local` ships
-     only the Supabase project URL plus anon/service-role keys — no
-     Postgres password and no connection string. The backup
-     `.env.local~` carries an empty `SUPABASE_DB_PASSWORD=`.
-  These belong to Foundations / the founder, so the actual `db:migrate`
-  invocation is recorded as a manual checkpoint.
-- **Run `scripts/db/verify.sql`.** Same blocker: needs `psql` +
-  `DATABASE_URL`.
-- **Run `npm run db:seed` against dev.** Same blocker.
-- **Run the QA agent's RLS suite (`npm run test:rls`) end-to-end.** The
-  suite is authored and ready, but `tests/_helpers/env.ts` requires
-  `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`, and
-  `TEST_SUPABASE_SERVICE_ROLE_KEY` to be set and pointed at a *disposable*
-  Supabase project (deliberately not the dev project, so a misconfigured
-  shell can't corrupt the team's dev data). The suite `describe.skipIf`s
-  out without them — so it runs green but covers nothing today.
+- **Run `npm run db:migrate` against dev or staging.** Two blockers,
+  both environmental:
+  1. `psql` is not on PATH on this machine. `scripts/db/migrate.sh`
+     calls `psql` directly; without it the script exits 2 with a clear
+     "install the postgres client" message.
+  2. No `DATABASE_URL` is provisioned. `.env.local` carries the
+     `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` +
+     `SUPABASE_SERVICE_ROLE_KEY` for the dev project, but the Postgres
+     connection string
+     (`postgresql://postgres:<DB_PASSWORD>@db.<ref>.supabase.co:5432/postgres`)
+     is not present, and provisioning secrets is explicitly out of this
+     agent's authority. Operating rule: secrets handled by Foundations
+     / the founder.
+
+  Confirmed by running `npm run db:migrate` — it exited 2 with the
+  expected "DATABASE_URL is not set" message. Migration files are
+  idempotent, sit at five hundred lines of clean SQL, and pass the
+  static `verify.sql` shape (no parser changes since they were last
+  audited).
+
+- **Run `npm run db:seed`.** Same `DATABASE_URL` blocker. The seed
+  script also refuses unless `APP_ENV` is `development` / `staging` /
+  `test`, which is correct guard rails (production must never seed).
+
+- **Run `scripts/db/verify.sql` against a live database.** Same
+  blocker. The verifier itself is unchanged in structure; only the
+  storage-policy spot-check was added in this run, and it is
+  conditional on `pg_namespace.nspname = 'storage'` so it degrades
+  cleanly on non-Supabase Postgres.
+
+- **Exercise `tests/rls/policies.test.ts`.** The suite is written by
+  the QA agent and `describe.skipIf(noTestSupabaseEnv())`s out without
+  `TEST_SUPABASE_URL` / `TEST_SUPABASE_ANON_KEY` /
+  `TEST_SUPABASE_SERVICE_ROLE_KEY`. Same disposable-project
+  provisioning blocker that Auth, Core API, and QA all flagged.
+
+- **Regenerate `lib/types/database.ts` from the live schema** via
+  `supabase gen types typescript`. The `supabase` CLI is not on PATH on
+  this machine; the hand-authored shapes remain the interim contract.
+  Plan: regenerate the first time the migration set lands against the
+  dev project, then drop the hand-authored placeholder in favour of
+  the generated file. Out of phase-1 scope.
 
 ## INTERFACES PUBLISHED
 
-The Phase 0 frozen contract is unchanged in Phase 1. Authoritative
-artifacts re-asserted here for clarity:
+Frozen at the close of Phase 1 — consumed by Auth & Identity, Core API,
+Payments, and Frontend:
 
-- **Migration set** — `supabase/migrations/20260515000100..600_*.sql`.
-  Eight tables (`users`, `companion_profiles`, `availability`,
-  `meal_requests`, `bookings`, `payments`, `messages`, `reviews`),
-  ten enums, three PostGIS GiST geo-indexes, RLS enabled on every
-  public table, and the `public.is_booking_participant(uuid)` helper.
-- **Shared types & enums** — `lib/types/index.ts` re-exports
-  `enums.ts` (string-literal unions + `REQUEST_NEXT_STATES` /
-  `BOOKING_NEXT_STATES`) and `database.ts` (`Database` generic with
-  `Row`/`Insert`/`Update` shapes for every table). Already consumed by
-  `lib/supabase/{client,server}.ts`, the Auth & Identity flow, and the
-  `/api/profiles` module.
-- **Seed identities** — four `joinmytable.test` accounts
-  (`ava.seeker@`, `ben.companion@`, `cleo.both@`, `dan.unverified@`),
-  password `Password123!`, ready to load via `npm run db:seed` once
-  the manual checkpoint clears.
-- **Runner contract** — `npm run db:migrate` / `npm run db:seed`
-  (`scripts/db/{migrate,seed}.sh`): idempotent, `DATABASE_URL`-driven,
-  `APP_ENV=production` blocks seed.
-- **Verifier** — `scripts/db/verify.sql` is the post-migrate smoke
-  gate (extensions, enums, tables, RLS-on, GiST indexes, helper fn,
-  policy names).
+- **Schema migrations**
+  `supabase/migrations/20260515000100..600_*.sql` (Phase 0, unchanged)
+  + `supabase/migrations/20260515010000_storage_rls.sql` (new this
+  phase). Eight `public` tables, ten enums, GiST geo indexes on three
+  `geography(Point, 4326)` columns, RLS on every `public` table, the
+  `public.is_booking_participant(uuid)` helper, plus
+  `avatars`/`verification` Storage buckets with owner-only RLS on
+  `storage.objects`.
 
-No new published interfaces this phase; nothing changed, nothing
-deprecated.
+- **Shared types** — `@/lib/types`:
+  - `MealType`, `VerificationStatus`, `RequestStatus`, `BookingStatus`,
+    `BudgetTier`, `PaymentStatus`, `EscrowStatus`, `MessageType`,
+    `ReviewSubjectType`, `CancellationParty`.
+  - `MEAL_TYPES`, `BOOKING_NEXT_STATES`, `REQUEST_NEXT_STATES`
+    transition maps.
+  - `UserRow|Insert|Update`, `CompanionProfileRow|Insert|Update`,
+    `AvailabilityRow|Insert|Update`, `MealRequestRow|Insert|Update`,
+    `BookingRow|Insert|Update`, `PaymentRow|Insert|Update`,
+    `MessageRow|Insert|Update`, `ReviewRow|Insert|Update`.
+  - `Database` generic — already wired into
+    `lib/supabase/{client,server}.ts`.
+  - `GeoJSONPoint` for the PostGIS columns.
+
+- **Storage contract** — `avatars` (public; owner-only writes;
+  `<userId>/...` prefix) and `verification` (private; owner-only
+  read/write; service role for admin review). Documented in
+  `supabase/README.md` → _Storage (storage.objects)_.
+
+- **Runner contract** — `npm run db:migrate`, `npm run db:seed`,
+  `psql "$DATABASE_URL" -f scripts/db/verify.sql`. Idempotent;
+  `APP_ENV=production` blocks seed; verifier is non-mutating.
+
+- **Seed identities** — four `*@joinmytable.test` accounts (password
+  `Password123!`): `ava.seeker`, `ben.companion`, `cleo.both`,
+  `dan.unverified`. One completed Ava↔Ben booking with payment, two
+  messages + one system entry, two-way 5★ reviews. One pending request
+  from Cleo→Ben.
 
 ## MANUAL CHECKPOINTS
 
-The actual cloud-side rollout below is operator work — it modifies
-Supabase project state and needs credentials this sandbox does not
-have. None of it is blocked on more Database-agent code.
+For the Orchestrator / Foundations / founder. None of these block more
+Database-agent code work; they are the prerequisites for actually
+landing the migrations + seed against the dev and staging projects.
 
-1. **Install `psql`.** macOS: `brew install libpq && brew link --force libpq`
-   (or `brew install postgresql@16`). CI: install the postgres client
-   in the job image.
-2. **Get the Supabase Postgres connection strings.**
-   Project Settings → Database → Connection string. Pattern:
+1. **Install `psql` on the operator machine and on CI.**
+   `scripts/db/migrate.sh`, `scripts/db/seed.sh`, and the
+   post-migration verifier all shell out to `psql`. On macOS:
+   `brew install libpq && brew link --force libpq` (or
+   `brew install postgresql@16`).
+
+2. **Provision `DATABASE_URL` for dev and staging.** The pattern is
    `postgresql://postgres:<DB_PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres`.
-   Keep dev and staging credentials separate; never commit either.
-3. **Apply migrations to dev:**
-   ```
-   DATABASE_URL="postgresql://postgres:<dev-pass>@db.<dev-ref>.supabase.co:5432/postgres" \
+   Get the password from the Supabase dashboard
+   (_Project Settings → Database → Connection string_). Store these
+   per-environment; never commit them.
+
+3. **Apply the migrations** (idempotent; safe to re-run):
+
+   ```bash
+   # Dev
+   DATABASE_URL="postgresql://postgres:<dev-password>@db.<dev-ref>.supabase.co:5432/postgres" \
      npm run db:migrate
+
+   # Staging
+   DATABASE_URL="postgresql://postgres:<staging-password>@db.<staging-ref>.supabase.co:5432/postgres" \
+     npm run db:migrate
+   ```
+
+4. **Verify the applied schema:**
+
+   ```bash
    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/db/verify.sql
    ```
-   The verifier must end with `verify: ok - extensions, enums, tables, RLS, GiST indexes, helpers, and policies are all present.`
-4. **Apply migrations to staging:** same incantation against the
-   staging `DATABASE_URL`. Re-runs are no-ops by design.
-5. **Seed dev:**
-   ```
+
+   Expected final line:
+   `NOTICE:  verify: ok - extensions, enums, tables, RLS, GiST indexes, helpers, storage policies, and core policies are all present.`
+
+5. **Seed the dev database** (refused if `APP_ENV=production`):
+
+   ```bash
    APP_ENV=development \
-   DATABASE_URL="postgresql://postgres:<dev-pass>@db.<dev-ref>.supabase.co:5432/postgres" \
+   DATABASE_URL="postgresql://postgres:<dev-password>@db.<dev-ref>.supabase.co:5432/postgres" \
      npm run db:seed
    ```
-   The seed script refuses to run against `APP_ENV=production`.
-   Staging seed is optional; production must never receive seed data.
-6. **Exercise RLS against the live policies.** Provision a *disposable*
-   Supabase project (not dev, not staging) and export
-   `TEST_SUPABASE_URL` / `TEST_SUPABASE_ANON_KEY` /
-   `TEST_SUPABASE_SERVICE_ROLE_KEY`, then run
-   `npm run test:rls`. The suite at `tests/rls/policies.test.ts`
-   covers every users / companion_profiles / availability policy
-   clause-for-clause; meal_requests / bookings / payments / messages /
-   reviews participant-vs-non-participant coverage will land when the
-   Core API agent finishes those modules in a later phase
-   (already noted in that file).
-7. **Open product decisions still routed to the founder via the
-   Orchestrator** (carried over from Phase 0 — none of these gate
-   migration application, but each will spawn a follow-up migration):
-   - Platform fee % (`payments.platform_fee_cents` exists; rule TBD).
-   - Escrow release trigger (column wiring exists; semantics TBD —
-     Payments + Core API).
-   - Cancellation policy (`bookings.cancelled_by`,
-     `payments.escrow_status='refunded'` wired; refund tier rules TBD).
-   - Trust & Safety review of `reviews_select_public` (currently
-     world-readable so companion profiles can render ratings; T&S
-     may want to gate reviews-of-seekers to verified booking partners
-     only).
+
+   Optionally seed staging the same way with `APP_ENV=staging`.
+
+6. **Provision a disposable Supabase project for tests** and export:
+   ```
+   TEST_SUPABASE_URL=https://<ref>.supabase.co
+   TEST_SUPABASE_ANON_KEY=...
+   TEST_SUPABASE_SERVICE_ROLE_KEY=...
+   ```
+   This unblocks `tests/rls/policies.test.ts` (RLS fence verification)
+   and `tests/integration/profiles.test.ts` (PostgREST round-trips).
+   The QA agent's suite already self-skips when these are absent, so CI
+   stays green; once provisioned the suites run unchanged.
+
+7. **Regenerate `lib/types/database.ts`** with
+   `npx supabase gen types typescript --project-id <dev-ref>` once the
+   migrations land. Replace the hand-authored placeholder; the Phase 0
+   shapes are deliberately conservative so the swap is a no-op for
+   every consuming agent.
+
+8. **Self-verification fence (CORE PRODUCT RULE #9 — deferred).**
+   `companion_profiles_update_self` lets the owner update every column,
+   which technically allows a malicious caller (with their own JWT
+   against PostgREST) to set
+   `verification_status = 'verified' / verified_at = now()`. The
+   application surface deliberately offers no such field write, but
+   the DB does not block it. The right fix is a `before update` trigger
+   on `companion_profiles` that, when
+   `auth.role() <> 'service_role'`, rejects writes to
+   `verification_status`, `verified_at`, `stripe_connect_account_id`,
+   `stripe_payouts_enabled`, `avg_rating`, `rating_count`. Flagged as
+   a Database-agent follow-up to be authored alongside the admin
+   verification surface (Auth's open item #4 + Trust & Safety phase).
+
+9. **Open product decisions still routed to the Orchestrator** (these
+   shape future migrations, not this one):
+   - Platform fee % — `payments.platform_fee_cents` is wired; the rule
+     is owned by Payments + Orchestrator.
+   - Escrow release trigger — column wiring exists; the actual trigger
+     (both tap "done"? timer? Core API decision) is unresolved.
+   - Cancellation policy — `bookings.cancelled_by`,
+     `cancellation_reason`, and `payments.escrow_status='refunded'` are
+     wired; refund-tier rules are not.
+   - Verification depth — `verification_status` enum is in place; the
+     workflow steps belong to Auth & Identity.
+   - T&S review of `reviews_select_public` — currently public so
+     companion-profile rendering works; T&S may want to gate
+     reviews-of-seekers to verified booking partners only. Flagged for
+     their Phase 5 audit, not changed unilaterally.

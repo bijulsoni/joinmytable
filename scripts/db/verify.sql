@@ -132,5 +132,30 @@ begin
     raise exception 'verify: expected RLS policy % is missing', missing_policy;
   end if;
 
-  raise notice 'verify: ok - extensions, enums, tables, RLS, GiST indexes, helpers, and policies are all present.';
+  -- Spot-check the storage.objects policies authored by the storage RLS
+  -- migration. Skipped when the storage schema is not present (i.e. the
+  -- target is not a Supabase project) so this verifier still works
+  -- against a plain Postgres.
+  if exists (select 1 from pg_namespace where nspname = 'storage') then
+    select expected into missing_policy
+    from (values
+      ('storage', 'objects', 'avatars_select_public'),
+      ('storage', 'objects', 'avatars_insert_owner'),
+      ('storage', 'objects', 'avatars_update_owner'),
+      ('storage', 'objects', 'avatars_delete_owner'),
+      ('storage', 'objects', 'verification_select_owner'),
+      ('storage', 'objects', 'verification_insert_owner'),
+      ('storage', 'objects', 'verification_delete_owner')
+    ) as v(sch, tbl, expected)
+    where not exists (
+      select 1 from pg_policies
+      where schemaname = v.sch and tablename = v.tbl and policyname = v.expected
+    )
+    limit 1;
+    if missing_policy is not null then
+      raise exception 'verify: expected storage RLS policy % is missing', missing_policy;
+    end if;
+  end if;
+
+  raise notice 'verify: ok - extensions, enums, tables, RLS, GiST indexes, helpers, storage policies, and core policies are all present.';
 end$$;
