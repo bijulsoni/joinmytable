@@ -7,9 +7,9 @@ refs") and the wire contract was published in
 (Next 15 + ESLint 9 + async `cookies()`) brought the slice forward;
 `app/api/profiles/_lib/auth.ts` already `await`s
 `createSupabaseServerClient()`, so no follow-up patch was required.
-This re-invocation re-audited the slice end-to-end and ran the gates
-that exist locally - everything is still green and no code change was
-needed. The artifact this run produces is this log.
+This re-invocation re-audits the slice end-to-end against the phase-1
+task list and the CORE PRODUCT RULES, re-runs the local gates - all
+green - and produces no new code changes. The artifact is this log.
 
 ## WHAT I DID
 
@@ -26,9 +26,9 @@ needed. The artifact this run produces is this log.
     belt-and-braces).
   - `app/api/profiles/_lib/db.ts` - request-scoped Supabase client
     factory; `LooseSupabaseClient` cast side-steps the known
-    `@supabase/postgrest-js` row-inference collapse against the frozen
-    `Database` type. Results are re-narrowed to the published `*Row`
-    types from `@/lib/types` at the boundary; RLS remains the
+    `@supabase/postgrest-js` row-inference collapse against the
+    frozen `Database` type. Results are re-narrowed to the published
+    `*Row` types from `@/lib/types` at the boundary; RLS remains the
     authoritative fence.
   - `app/api/profiles/_lib/errors.ts` - the stable `ApiErrorCode`
     union and JSON envelope every endpoint returns
@@ -43,9 +43,11 @@ needed. The artifact this run produces is this log.
     `service_radius_m` 500..100000, `meal_types` non-empty subset of
     the published `MEAL_TYPES`, GeoJSON Point with WGS-84 ranges,
     HH:MM[:SS] times, IANA timezones, `end_time > start_time`
-    refinement on availability create/update). CORE PRODUCT RULE #1
-    (lunch and dinner only) is enforced here by typing `meal_type`
-    against the `MealType` literal union from `@/lib/types`.
+    refinement on availability create/update; the update schema
+    additionally requires at least one provided field). CORE PRODUCT
+    RULE #1 (lunch and dinner only) is enforced here by typing
+    `meal_type` against the `MealType` literal union from
+    `@/lib/types`.
   - `app/api/profiles/_lib/types.ts` - the published wire shapes
     (`OwnCompanionProfileDTO`, `PublicCompanionProfileDTO`,
     `AvailabilityDTO`) plus row-to-DTO mappers. The owner DTO joins
@@ -87,33 +89,36 @@ needed. The artifact this run produces is this log.
     or clears `users.avatar_path`. The supplied path is required to
     live under the caller's `<userId>/` prefix - the convention the
     Auth uploader uses - so a caller cannot point their avatar at
-    someone else's object.
+    someone else's object. The storage-side fence shipped in
+    `supabase/migrations/20260515010000_storage_rls.sql`
+    (Database agent) backs the application check.
   - `app/api/profiles/CONTRACT.md` - frozen wire contract for the
-    Frontend agent. Endpoint shapes, status codes, error envelope, the
-    `ApiErrorCode` union, all DTOs, and the GeoJSON Point convention
-    are documented in one place.
+    Frontend agent. Endpoint shapes, status codes, error envelope,
+    the `ApiErrorCode` union, all DTOs, and the GeoJSON Point
+    convention are documented in one place.
 
 - **Verified the slice still builds under the Foundations rebase**
   (Next 15 + ESLint 9 + async `cookies()` in 3a6e048; Database and
-  Auth re-pins in b064799 / f81d221 / 8422021 / b336861). The auth
-  gate `await`s `createSupabaseServerClient()` so the `cookies()`
-  async change is already absorbed; route handler signatures remain
-  Next-15-compatible.
+  Auth re-pins in b064799 / f81d221 / 8422021 / b336861 / 22e6d7c /
+  4323569 / 7bdb5ed / 66ea7cb / 032cdde). The auth gate `await`s
+  `createSupabaseServerClient()` so the `cookies()` async change is
+  already absorbed; route handler signatures remain
+  Next-15-compatible (type-check is clean).
 
 - **Confirmed CORE PRODUCT RULE coverage at this layer:**
   - #1 (lunch and dinner only): every meal-type field is typed
     against `MealType` from `@/lib/types`; zod rejects anything else.
-  - #5 (one account, two modes): `requireCompanionMode()` blocks every
-    write that touches companion-owned state.
+  - #5 (one account, two modes): `requireCompanionMode()` blocks
+    every write that touches companion-owned state.
   - #9 (unverified companions are non-discoverable / non-bookable):
     `GET /api/profiles/[id]` returns 404 when RLS hides the row, and
     the API surface deliberately offers no path to set
     `verification_status` / `verified_at`.
   - The API never accepts `stripe_connect_account_id` /
     `stripe_payouts_enabled` writes (those are Payments-agent
-    territory) and never accepts `avg_rating` / `rating_count` writes
-    (those are roll-ups maintained by the reviews module in a later
-    phase).
+    territory) and never accepts `avg_rating` / `rating_count`
+    writes (those are roll-ups maintained by the reviews module in a
+    later phase).
 
 - **Ran the gates that exist locally - all green:**
   - `npm run lint`        -> clean.
@@ -122,14 +127,9 @@ needed. The artifact this run produces is this log.
     QA-agent's mocked `requireAuth` / `requireCompanionMode` branch
     coverage (`tests/unit/auth-gate.test.ts`), the profile validator
     bounds (`tests/unit/profile-validators.test.ts`), the JSON body
-    parser (`tests/unit/parse-json-body.test.ts`), the error envelope
-    (`tests/unit/api-errors.test.ts`), and the status-transition
-    invariants (`tests/unit/enums-transitions.test.ts`).
-  - `npm run build`       -> 16/16 routes generated. All five
-    profiles routes (`/api/profiles/[id]`, `/api/profiles/me`,
-    `/api/profiles/me/availability`,
-    `/api/profiles/me/availability/[id]`, `/api/profiles/me/photo`)
-    appear in the route manifest.
+    parser (`tests/unit/parse-json-body.test.ts`), the error
+    envelope (`tests/unit/api-errors.test.ts`), and the
+    status-transition invariants (`tests/unit/enums-transitions.test.ts`).
   - `npm run test:integration` and `npm run test:rls` - the relevant
     suites exist (`tests/integration/profiles.test.ts`,
     `tests/rls/policies.test.ts`) but `describe.skipIf` out without
@@ -142,13 +142,13 @@ needed. The artifact this run produces is this log.
 
 ## WHAT I COULD NOT DO
 
-- **End-to-end exercise the endpoints against a live Supabase project.**
-  `.env.local` still ships placeholder Supabase URL / anon /
-  service-role values (Foundations / founder territory), so an actual
-  HTTP request against the route handlers cannot be authorized today.
-  Verification is currently typecheck + lint + unit tests + build, plus
-  an audit against the published schema and RLS policies. Same blocker
-  the Database and Auth agents recorded.
+- **End-to-end exercise the endpoints against a live Supabase
+  project.** `.env.local` still ships placeholder Supabase URL / anon
+  / service-role values (Foundations / founder territory), so an
+  actual HTTP request against the route handlers cannot be
+  authorized today. Verification is currently typecheck + lint + unit
+  tests, plus an audit against the published schema and RLS
+  policies. Same blocker the Database and Auth agents recorded.
 
 - **Run the integration and RLS suites against a disposable Supabase
   project.** Both suites need `TEST_SUPABASE_URL`,
@@ -159,11 +159,11 @@ needed. The artifact this run produces is this log.
 
 - **Build the rest of the Core API surface** (`/search`, `/requests`,
   `/bookings`, `/messaging`, `/reviews`, `/notifications`). These are
-  explicitly out of phase-1 scope per the execution plan and per this
-  run's task list. They will land in later phases against the same
-  patterns this module establishes (auth gate, zod validators with
-  DB-mirrored bounds, RLS-as-final-fence, no writes to roll-up or
-  owner-only columns).
+  explicitly out of phase-1 scope per the execution plan and per
+  this run's task list. They will land in later phases against the
+  same patterns this module establishes (auth gate, zod validators
+  with DB-mirrored bounds, RLS-as-final-fence, no writes to roll-up
+  or owner-only columns).
 
 - **Wire profile changes into transactional emails.** `notifications`
   is a future Core API module; the Integrations agent owns
@@ -175,11 +175,11 @@ The frozen wire contract for the Frontend agent (unchanged since
 87f1fe5):
 
 - **Document**: `app/api/profiles/CONTRACT.md` - endpoint shapes,
-  status codes, error envelope, error-code table, GeoJSON convention,
-  and the full DTO appendix.
+  status codes, error envelope, error-code table, GeoJSON
+  convention, and the full DTO appendix.
 
-- **HTTP surface** (all routes are JSON in / JSON out, all require an
-  authenticated caller via the request-scoped Supabase client):
+- **HTTP surface** (all routes are JSON in / JSON out, all require
+  an authenticated caller via the request-scoped Supabase client):
   - `GET    /api/profiles/me`                   - own companion profile
   - `PUT    /api/profiles/me`                   - upsert own profile (companion mode required)
   - `DELETE /api/profiles/me`                   - delete own profile (cascades availability)
@@ -199,56 +199,57 @@ The frozen wire contract for the Frontend agent (unchanged since
     strips owner-only fields (no email, no Stripe ids); embeds the
     companion's full availability list.
   - `AvailabilityDTO` - one recurring weekly window.
-  - Mappers `toOwnCompanionProfileDTO`, `toPublicCompanionProfileDTO`,
-    `toAvailabilityDTO`. The Frontend agent imports these for
-    response typing.
+  - Mappers `toOwnCompanionProfileDTO`,
+    `toPublicCompanionProfileDTO`, `toAvailabilityDTO`. The Frontend
+    agent imports these for response typing.
 
 - **Error envelope** (`app/api/profiles/_lib/errors.ts`):
   - `{ error: { code, message, details? } }` - `code` is the stable
-    `ApiErrorCode` union the Frontend can switch on; `details` is the
-    `ZodError.flatten()` shape on validation failures.
+    `ApiErrorCode` union the Frontend can switch on; `details` is
+    the `ZodError.flatten()` shape on validation failures.
 
-- **What is NOT writable from this surface** (frozen as a non-feature):
-  `verification_status`, `verified_at`, `stripe_connect_account_id`,
-  `stripe_payouts_enabled`, `avg_rating`, `rating_count` on
-  `companion_profiles` are owned by other agents and silently dropped
-  from PUT bodies (the zod schema does not include them).
+- **What is NOT writable from this surface** (frozen as a
+  non-feature): `verification_status`, `verified_at`,
+  `stripe_connect_account_id`, `stripe_payouts_enabled`,
+  `avg_rating`, `rating_count` on `companion_profiles` are owned by
+  other agents and silently dropped from PUT bodies (the zod schema
+  does not include them).
 
 ## MANUAL CHECKPOINTS
 
-For the Orchestrator / Foundations / founder. None of these block more
-Core-API code work:
+For the Orchestrator / Foundations / founder. None of these block
+more Core-API code work:
 
 1. **Provision Supabase project envs.** `.env.local` still ships
    placeholders for `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
-   Until those point at a real project, no `/api/profiles` request can
-   be authorized end-to-end. Same blocker the Database and Auth
+   Until those point at a real project, no `/api/profiles` request
+   can be authorized end-to-end. Same blocker the Database and Auth
    agents flagged.
 
-2. **Apply migrations to dev/staging** so the profiles module has the
-   `companion_profiles` and `availability` tables (and the
+2. **Apply migrations to dev/staging** so the profiles module has
+   the `companion_profiles` and `availability` tables (and the
    `companion_profiles_select_verified` RLS policy that backs the
    verification gate) actually present. Owner: Database agent /
    Foundations - the incantation is documented in
-   `orchestration-logs/phase-1/Database_Agent.log` (manual checkpoint
-   #3).
+   `orchestration-logs/phase-1/Database_Agent.log`.
 
 3. **Provision a disposable Supabase project for tests** and export
    `TEST_SUPABASE_URL` / `TEST_SUPABASE_ANON_KEY` /
    `TEST_SUPABASE_SERVICE_ROLE_KEY`. That unblocks the QA agent's
    `tests/integration/profiles.test.ts` (PUT/GET/DELETE round-trips
-   against PostgREST) and `tests/rls/policies.test.ts` (verification
-   gate, owner-only update fence). Same disposable-project requirement
-   the Database agent's checkpoint #6 calls out.
+   against PostgREST) and `tests/rls/policies.test.ts`
+   (verification gate, owner-only update fence). Same
+   disposable-project requirement the Database agent's manual
+   checkpoint calls out.
 
-4. **Storage bucket RLS for `avatars`** - now landed in
+4. **Storage bucket RLS for `avatars`** - landed in
    `supabase/migrations/20260515010000_storage_rls.sql` (Database
-   agent, phase-1). The photo endpoint enforces the `<userId>/` prefix
-   on the *path string*; the storage migration adds the matching
-   storage.objects RLS so a compromised client cannot bypass the
-   application check. Confirm the migration has actually been applied
-   to dev/staging when checkpoint #2 above is executed.
+   agent, phase-1). The photo endpoint enforces the `<userId>/`
+   prefix on the *path string*; the storage migration adds the
+   matching storage.objects RLS so a compromised client cannot
+   bypass the application check. Confirm the migration has actually
+   been applied to dev/staging when checkpoint #2 above is executed.
 
 5. **Open product decisions still routed to the founder via the
    Orchestrator** that touch this surface in later phases:
