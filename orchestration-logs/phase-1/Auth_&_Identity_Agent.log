@@ -1,70 +1,87 @@
 phase-1 / Auth & Identity Agent
 
 Phase-1 Auth & Identity code shipped in commit 55e1680 ("phase-1(auth):
-supabase auth, two-mode accounts, verification flow") and was adapted to
-Next 15 + ESLint 9 + async `cookies()` in 3a6e048. Commit 8422021
-recorded the first re-audit pass. This invocation re-audits the owned
-slice once more against the phase-1 task list and the CORE PRODUCT
-RULES, runs the local gates (all green), and produces no new code
-changes - everything required is already in place.
+supabase auth, two-mode accounts, verification flow") and was adapted
+to Next 15 + ESLint 9 + async `cookies()` in 3a6e048. Commits 8422021
+and f81d221 recorded the first two re-audit passes. This invocation
+re-audits the owned slice once more against the phase-1 task list and
+the CORE PRODUCT RULES, runs the local gates (all green), and produces
+no new code changes - everything required is already in place.
 
 WHAT I DID
 
 - **Re-audited every file in the Auth & Identity owned area** against
   the phase-1 task list. The owned slice for this phase is exactly
   `app/(auth)/**` + `lib/auth/**` + the auth-session refresh in
-  `middleware.ts` + the `AuthProvider` mount in `app/layout.tsx`:
+  `middleware.ts` + the `AuthProvider` mount in `app/layout.tsx`.
+  Findings, cross-checked against the current tree:
 
   - Supabase Auth (email/password) is integrated via `@supabase/ssr`.
     The shared clients live under `lib/supabase/{client,server}.ts`
     (Foundations area, consumed only); the auth-cookie refresh
-    middleware lives in `middleware.ts` and the `AuthProvider` is
-    mounted once in `app/layout.tsx` with the server-resolved initial
-    session so first paint already reflects logged-in/out state.
+    middleware lives in `middleware.ts:11-44` (skips static + Next
+    internals via the `matcher` at 49-51) and the `AuthProvider` is
+    mounted once in `app/layout.tsx:26-47` with the server-resolved
+    initial session so first paint already reflects logged-in/out
+    state. `middleware.ts:16-21` falls through cleanly when env vars
+    are still placeholder so the layout still renders.
 
   - Sign-up (screen 1), login, password reset, email-confirmation
     callback, check-email landing, mode-switcher, and logout all live
     under `app/(auth)/`. Every form is server-action backed
     (`useFormState` + zod) so server-side validation is the source of
-    truth (CORE PRODUCT RULE: server-side authority).
+    truth (CORE PRODUCT RULE: server-side authority). Confirmed
+    surfaces (matched against the `npm run build` route table this
+    run): `/sign-up`, `/login`, `/forgot-password`, `/reset-password`,
+    `/check-email`, `/mode`, `/callback`, `/logout`, `/verify`,
+    `/verify/accept-guidelines`, `/verify/companion`.
 
   - One-account-two-modes captured at sign-up (both `isSeeker` /
-    `isCompanion` flags), persisted in the `public.users` mirror row via
-    the admin client (the new auth user has no session yet at insert
-    time), and editable later from `/mode`.
+    `isCompanion` flags), persisted in the `public.users` mirror row
+    via the admin client at `lib/auth/profile.ts:27-58` (the new auth
+    user has no session yet at insert time so RLS-bound writes are not
+    available), and editable later from `/mode`.
     `lib/auth/profile.ts#updateUserModes` refuses to clear both flags
-    client-side; the `users_at_least_one_mode` CHECK constraint in the
-    DB is the belt-and-braces fence (CORE PRODUCT RULE #5).
+    client-side (lines 66-95); the `users_at_least_one_mode` CHECK
+    constraint in the DB is the belt-and-braces fence (CORE PRODUCT
+    RULE #5).
 
-  - Verification flow at two intensities, mirroring the spec:
+  - Verification flow at two intensities, mirroring the spec
+    (`lib/auth/verification.ts`):
     * **Seeker (lighter)**: email confirmation (Supabase Auth) +
       community guidelines acceptance auto-promote
       `users.seeker_verification_status` to `'verified'` via
-      `reconcileSeekerVerification`, which runs from sign-up, login,
-      the auth callback, and the `/verify/accept-guidelines` route.
-    * **Companion (stronger)**: `/verify/companion` submits legal name
-      + an identity document. The document goes to a private
+      `reconcileSeekerVerification` (lines 106-130), which runs from
+      sign-up, login, the auth callback, and the
+      `/verify/accept-guidelines` route.
+    * **Companion (stronger)**: `/verify/companion` submits legal
+      name + an identity document. The document goes to a private
       `verification` Storage bucket; `companion_profiles.verification
-      _status` moves to `'pending'`. The transition to `'verified'` is
-      reserved for an admin/review path and is intentionally NOT
-      exposed in the application surface. Until `'verified'`, RLS
-      hides the row from discovery (CORE PRODUCT RULE #9), enforced in
-      the database by `companion_profiles_select_verified`.
+      _status` moves to `'pending'` via
+      `submitCompanionVerification` (lines 48-98). The transition to
+      `'verified'` is reserved for an admin / review path and is
+      intentionally NOT exposed in the application surface. Until
+      `'verified'`, RLS hides the row from discovery (CORE PRODUCT
+      RULE #9), enforced in the database by
+      `companion_profiles_select_verified`.
 
   - Profile photo upload (`lib/auth/storage.ts`) with server-side MIME
-    allow-list (jpeg/png/webp/heic/heif) + per-bucket size caps (5 MB
-    avatars, 10 MB verification), idempotent bucket provisioning, and
-    writeback of `users.avatar_path`. The upload uses the admin client
-    so it cannot escape the `<userId>/...` prefix enforced in
-    application code; the Database agent's
-    `20260515010000_storage_rls.sql` migration is the defense-in-depth
-    layer that fences direct (anon/JWT) writes to the same prefix.
+    allow-list (jpeg / png / webp / heic / heif, lines 29-35) +
+    per-bucket size caps (5 MB avatars / 10 MB verification, lines
+    37-38), idempotent bucket provisioning (`ensureBucket`, lines
+    61-76), object keys prefixed with `<userId>/...` (lines 117 +
+    148), and writeback of `users.avatar_path` (lines 128-132). The
+    upload uses the admin client so it cannot escape the
+    `<userId>/...` prefix enforced in application code; the Database
+    agent's `20260515010000_storage_rls.sql` migration is the
+    defense-in-depth layer that fences direct (anon / JWT) writes to
+    the same prefix.
 
-  - The `/verify` hub surfaces both flows in one mobile-first card:
-    email-confirmation status, guidelines acceptance, profile photo
-    uploader, seeker-status pill, and companion verification CTA /
-    pending / verified / rejected pills. Includes a sign-out form for
-    convenience.
+  - The `/verify` hub surfaces both flows in one mobile-first card
+    (`app/(auth)/verify/page.tsx`): email-confirmation status,
+    guidelines acceptance, profile photo uploader, seeker-status
+    pill, and companion verification CTA / pending / verified /
+    rejected pills. Includes a sign-out form for convenience.
 
   - Unverified-companion gating (CORE PRODUCT RULE #9) is enforced at
     THREE layers:
@@ -80,61 +97,61 @@ WHAT I DID
        moves the status from `'unverified'` to `'pending'`.
 
 - **Confirmed CORE PRODUCT RULE coverage** at this layer:
-  - #1 (lunch and dinner only): no meal-type input on any auth surface;
-    when `/verify` reads companion profile rows, `meal_types` is typed
-    against `MealType` from `@/lib/types`.
-  - #5 (one account, two modes): independent `is_seeker` / `is_companion`
-    flags captured at sign-up and editable on `/mode`, with the
-    at-least-one-mode invariant enforced at three layers (zod schema in
-    sign-up action, the `updateUserModes` helper, and the
-    `users_at_least_one_mode` CHECK constraint).
-  - #9 (unverified companions are non-discoverable / non-bookable): as
-    above.
-  - #10 (card data never on our servers): no payment surface here; the
-    only Storage write is the profile photo + (private) verification
-    document, both image-only, validated server-side.
+  - #1 (lunch and dinner only): no meal-type input on any auth
+    surface; when `/verify` reads companion profile rows, `meal_types`
+    is typed against `MealType` from `@/lib/types`.
+  - #5 (one account, two modes): independent `is_seeker` /
+    `is_companion` flags captured at sign-up and editable on `/mode`,
+    with the at-least-one-mode invariant enforced at three layers
+    (zod schema in sign-up action, the `updateUserModes` helper, and
+    the `users_at_least_one_mode` CHECK constraint).
+  - #9 (unverified companions are non-discoverable / non-bookable):
+    as above.
+  - #10 (card data never on our servers): no payment surface here;
+    the only Storage writes are the profile photo + (private)
+    verification document, both image-only, validated server-side.
 
-- **Ran the gates that exist locally**:
+- **Ran the gates that exist locally** (all green this run):
   - `npm run lint`       - clean.
   - `npm run type-check` - clean.
   - `npm run test`       - 50/50 unit tests pass across 5 files
     (`enums-transitions`, `profile-validators`, `parse-json-body`,
     `auth-gate`, `api-errors`).
-  - `npm run build`      - 16/16 routes generated; the auth surface is
-    represented as `/sign-up`, `/login`, `/forgot-password`,
-    `/reset-password`, `/check-email`, `/mode`, `/callback`, `/logout`,
-    `/verify`, `/verify/accept-guidelines`, `/verify/companion`.
+  - `npm run build`      - 19 dynamic routes generated; auth surface
+    confirmed (see route list above) and the auth-aware middleware
+    is built at 87.2 kB.
 
 - **No code changes** were required in this re-run. The artifact this
-  invocation produces is the restored orchestration log + the commit
-  recording it.
+  invocation produces is the re-recorded orchestration log + the
+  commit recording it.
 
 WHAT I COULD NOT DO
 
-- **End-to-end exercise the auth flow against a live Supabase project.**
-  `.env.local` still ships placeholder Supabase URL / anon /
-  service-role values (Foundations / founder territory), so no actual
-  sign-up, login, password reset, OAuth callback, or Storage upload
-  HTTP round-trip can be authorized today. Verification is currently
-  typecheck + lint + unit tests + audit against the published schema +
-  RLS policies. Same blocker the Database and Core API agents recorded.
+- **End-to-end exercise the auth flow against a live Supabase
+  project.** `.env.local` still ships placeholder Supabase URL / anon
+  / service-role values (Foundations / founder territory), so no
+  actual sign-up, login, password reset, OAuth callback, or Storage
+  upload HTTP round-trip can be authorized today. Verification is
+  currently typecheck + lint + unit tests + audit against the
+  published schema + RLS policies. Same blocker the Database and Core
+  API agents recorded.
 
 - **Run the integration and RLS suites** (`tests/integration/*.test.ts`,
   `tests/rls/policies.test.ts`). The QA agent's harness `skipIf`s out
   without `TEST_SUPABASE_URL` / `TEST_SUPABASE_ANON_KEY` /
-  `TEST_SUPABASE_SERVICE_ROLE_KEY`, which point at a disposable project
-  (deliberately not dev). Operator-provisioned secrets - out of this
-  agent's authority.
+  `TEST_SUPABASE_SERVICE_ROLE_KEY`, which point at a disposable
+  project (deliberately not dev). Operator-provisioned secrets - out
+  of this agent's authority.
 
 - **Promote a verified companion** end-to-end. The transition from
   `'pending'` to `'verified'` is intentionally not exposed in the
-  application surface - it lives in the (yet-to-be-built) admin review
-  surface. Flagged below.
+  application surface - it lives in the (yet-to-be-built) admin
+  review surface. Flagged below.
 
-- **Integrate an actual third-party identity check** (Stripe Identity /
-  Persona / Veriff / equivalent). The Phase-1 flow captures legal name
-  + an uploaded ID image into the private `verification` bucket and
-  marks the row `'pending'`; the vendor-side review is the gap.
+- **Integrate an actual third-party identity check** (Stripe Identity
+  / Persona / Veriff / equivalent). The Phase-1 flow captures legal
+  name + an uploaded ID image into the private `verification` bucket
+  and marks the row `'pending'`; the vendor-side review is the gap.
   Flagged below.
 
 - **Deploy, push to git, modify secrets, or provision cloud
@@ -171,8 +188,8 @@ Payments, and Trust & Safety. All paths relative to the repo root.
   - `getSessionUser()` - returns the session user or `null`.
   - `requireSessionUser(redirectTo?)` - redirects to `/login` when
     signed out.
-  - `requireMode(mode, redirectTo?)` - redirects to `/login`/`/verify`/
-    `/mode` based on what's missing.
+  - `requireMode(mode, redirectTo?)` - redirects to `/login` /
+    `/verify` / `/mode` based on what's missing.
 
 - **Server-side profile/mode helpers** (`@/lib/auth/profile` -
   `server-only`):
@@ -185,20 +202,22 @@ Payments, and Trust & Safety. All paths relative to the repo root.
 
 - **Server-side verification helpers** (`@/lib/auth/verification` -
   `server-only`):
-  - `submitCompanionVerification({ legalName, documentPath })` - moves
-    `companion_profiles.verification_status` from `'unverified'` to
-    `'pending'`; idempotent for `'pending'` / `'verified'`.
+  - `submitCompanionVerification({ legalName, documentPath })` -
+    moves `companion_profiles.verification_status` from
+    `'unverified'` to `'pending'`; idempotent for `'pending'` /
+    `'verified'`.
   - `reconcileSeekerVerification(userId)` - syncs
     `users.seeker_verification_status` based on email-confirmed +
     guidelines-accepted.
 
-- **Server-side storage helpers** (`@/lib/auth/storage` - `server-only`):
+- **Server-side storage helpers** (`@/lib/auth/storage` -
+  `server-only`):
   - `AVATAR_BUCKET` / `VERIFICATION_BUCKET` constants.
   - `uploadAvatar(file: Blob)` - validates MIME + size, writes under
     `<userId>/avatar-<ts>.<ext>`, updates `users.avatar_path`.
-  - `uploadVerificationDocument(file: Blob)` - same validation, writes
-    under `<userId>/id-<ts>.<ext>` in the private bucket; non-upsert
-    so the doc trail is preserved.
+  - `uploadVerificationDocument(file: Blob)` - same validation,
+    writes under `<userId>/id-<ts>.<ext>` in the private bucket;
+    non-upsert so the doc trail is preserved.
   - `avatarPublicUrl(avatarPath: string | null)` - resolves a public
     avatar URL for SSR rendering.
 
@@ -207,9 +226,9 @@ Payments, and Trust & Safety. All paths relative to the repo root.
     `app/layout.tsx`; keeps the in-memory session in sync via
     Supabase's `onAuthStateChange`.
   - `useAuth()` - returns `{ session, isLoading, signOut }`. NOTE:
-    client code that needs role / verification state must hit a server
-    component or route handler - the auth-only session is not the
-    authoritative source for `is_seeker` / `is_companion` /
+    client code that needs role / verification state must hit a
+    server component or route handler - the auth-only session is not
+    the authoritative source for `is_seeker` / `is_companion` /
     `verification_status`.
 
 - **Storage convention** (frozen as the contract the Storage RLS
@@ -220,16 +239,16 @@ Payments, and Trust & Safety. All paths relative to the repo root.
     `<auth.uid()>/id-*` keys; no UPDATE (documents are write-once).
 
 - **Session-cookie refresh contract** (`middleware.ts`):
-  - Runs on every navigation/route except static assets + Next
+  - Runs on every navigation / route except static assets + Next
     internals. Touches `getUser()` to force a cookie rewrite when the
     access token is near expiry. Falls through cleanly when the env
     is not configured yet.
 
 MANUAL CHECKPOINTS
 
-For the Orchestrator / Foundations / founder. None of these block more
-Auth-agent code; they are the prerequisites for actually exercising the
-flow end-to-end.
+For the Orchestrator / Foundations / founder. None of these block
+more Auth-agent code; they are the prerequisites for actually
+exercising the flow end-to-end.
 
 1. **Provision Supabase project envs** for `dev`, `staging`, `prod`.
    `.env.local` still ships placeholder `NEXT_PUBLIC_SUPABASE_URL`,
@@ -250,11 +269,11 @@ flow end-to-end.
      reset case.
 
 3. **Apply the storage RLS migration** (`supabase/migrations/
-   20260515010000_storage_rls.sql`) alongside the rest of the Database
-   agent's contract. The `avatars` and `verification` buckets are also
-   created at first upload by the Auth uploader as a fallback, but
-   landing the migration ensures the policies are present on a fresh
-   project before any user write.
+   20260515010000_storage_rls.sql`) alongside the rest of the
+   Database agent's contract. The `avatars` and `verification`
+   buckets are also created at first upload by the Auth uploader as a
+   fallback, but landing the migration ensures the policies are
+   present on a fresh project before any user write.
 
 4. **Wire the admin verification surface** so a `'pending'` companion
    can be moved to `'verified'` (or `'rejected'`). Out of phase-1
@@ -274,14 +293,14 @@ flow end-to-end.
 
 6. **Open product decisions still routed to the founder via the
    Orchestrator** that touch this surface:
-   - Identity-verification vendor choice (Stripe Identity / Persona /
-     Veriff / etc.) - affects the companion verification flow.
+   - Identity-verification vendor choice (Stripe Identity / Persona
+     / Veriff / etc.) - affects the companion verification flow.
    - Whether to require email confirmation before allowing seeker
-     bookings - currently informational (`seeker_verification_status`
-     is not used to gate the booking API; CORE PRODUCT RULE #9 only
-     gates the companion side).
+     bookings - currently informational
+     (`seeker_verification_status` is not used to gate the booking
+     API; CORE PRODUCT RULE #9 only gates the companion side).
    - Whether the `display_name` on `users` should pass through a
-     moderation/PII filter at sign-up (Trust & Safety).
+     moderation / PII filter at sign-up (Trust & Safety).
    - Whether the community-guidelines copy is final - Trust & Safety
      owns the copy; we currently link to the (placeholder) page from
      the sign-up checkbox.
