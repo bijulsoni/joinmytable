@@ -1,121 +1,147 @@
 // Wire shapes for the profiles API.
 //
-// The Frontend agent should import these for response typing. They are
-// stable view-models layered on top of the database rows; we never
-// return raw `*Row` objects so that we can omit internal columns
-// (timestamps, denormalized scaffolding) without breaking consumers.
+// Owner: Core API agent. Stable view-models layered on top of database
+// rows; we never return raw `*Row` objects so we can omit internal
+// columns (created_at, photo_urls writability quirks, etc.) without
+// breaking consumers.
+//
+// Frozen against the CLAUDE.md schema (Phase 1 v2):
+//   - companion_profiles uses bio (text), service_area (text),
+//     location (GeoJSON Point | null), activities (jsonb map keyed by
+//     ActivityType -> boolean), rates (jsonb map keyed by ActivityType
+//     -> number USD), photo_urls (text[]), rating_avg (decimal string).
+//   - users carries name (not display_name) and verification_status; no
+//     avatar_path column.
+//   - availability uses companion_profile_id (FK to companion_profiles.id),
+//     day_or_date / time_range as free-form text, activity_types text[].
 
 import type {
+  ActivityType,
   AvailabilityRow,
+  CompanionActivitiesMap,
   CompanionProfileRow,
+  CompanionRatesMap,
   GeoJSONPoint,
-  MealType,
   UserRow,
   VerificationStatus,
 } from '@/lib/types';
 
+// ---------------------------------------------------------------------------
+// Companion profile DTOs
+// ---------------------------------------------------------------------------
+
 /**
- * Shape returned for the authenticated companion's own profile - includes
- * everything the owner needs to render the profile-setup screen.
+ * Owner-facing view of the signed-in user's companion profile. Includes
+ * everything the profile-setup screen needs in a single round-trip.
  */
 export interface OwnCompanionProfileDTO {
   user_id: string;
-  display_name: string;
+  name: string;
   email: string;
-  avatar_path: string | null;
-  headline: string | null;
-  bio_long: string | null;
-  rate_cents: number;
-  rate_currency: string;
-  meal_types: MealType[];
-  service_area_center: GeoJSONPoint;
-  service_radius_m: number;
-  verification_status: VerificationStatus;
+  is_seeker: boolean;
+  is_companion: boolean;
+  /** Seeker-side verification (mirrors users.verification_status). */
+  account_verification_status: VerificationStatus;
+  bio: string | null;
+  service_area: string | null;
+  location: GeoJSONPoint | null;
+  /** Activity-keyed booleans (lunch/dinner/coffee/happy_hour). */
+  activities: CompanionActivitiesMap;
+  /** Activity-keyed whole-dollar rates (companion-set, suggested ranges in CLAUDE.md). */
+  rates: CompanionRatesMap;
+  photo_urls: string[];
+  /** decimal(3,2) — serialized as string by PostgREST. */
+  rating_avg: string;
+  /** ISO timestamp when the companion profile was approved; null = unverified. */
   verified_at: string | null;
-  avg_rating: number | null;
-  rating_count: number;
   created_at: string;
-  updated_at: string;
 }
 
 /**
- * Public view of a companion - what we render on
- * `/companions/[id]`. Strips owner-only fields (Stripe connect ids,
- * email, etc.). Only verified companions are surfaced; the route returns
- * 404 otherwise (RLS already filters them out at the DB layer).
+ * Public-facing view rendered on `/companions/[id]`. Only verified
+ * companions are surfaced (RLS enforces this; the route returns 404
+ * otherwise). Strips owner-only fields (no email, no is_seeker flag).
  */
 export interface PublicCompanionProfileDTO {
   user_id: string;
-  display_name: string;
-  avatar_path: string | null;
-  headline: string | null;
-  bio_long: string | null;
-  rate_cents: number;
-  rate_currency: string;
-  meal_types: MealType[];
-  service_area_center: GeoJSONPoint;
-  service_radius_m: number;
-  avg_rating: number | null;
-  rating_count: number;
+  name: string;
+  bio: string | null;
+  service_area: string | null;
+  location: GeoJSONPoint | null;
+  activities: CompanionActivitiesMap;
+  rates: CompanionRatesMap;
+  photo_urls: string[];
+  rating_avg: string;
   availability: AvailabilityDTO[];
 }
 
+/** One availability window. day_or_date / time_range are free-form text
+ * per CLAUDE.md so callers can express recurring ("Mon", "weekdays") or
+ * one-off ("2026-06-04") slots without a schema change. */
 export interface AvailabilityDTO {
   id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  meal_type: MealType;
-  timezone: string;
+  day_or_date: string;
+  time_range: string;
+  activity_types: ActivityType[];
 }
 
 // ---------------------------------------------------------------------------
 // Mappers
 // ---------------------------------------------------------------------------
 
+function normalizeActivities(value: CompanionActivitiesMap | null): CompanionActivitiesMap {
+  return value ?? {};
+}
+
+function normalizeRates(value: CompanionRatesMap | null): CompanionRatesMap {
+  return value ?? {};
+}
+
+function normalizePhotos(value: string[] | null): string[] {
+  return value ?? [];
+}
+
 export function toOwnCompanionProfileDTO(
   profile: CompanionProfileRow,
-  user: Pick<UserRow, 'display_name' | 'email' | 'avatar_path'>,
+  user: Pick<
+    UserRow,
+    'id' | 'name' | 'email' | 'is_seeker' | 'is_companion' | 'verification_status'
+  >,
 ): OwnCompanionProfileDTO {
   return {
-    user_id: profile.user_id,
-    display_name: user.display_name,
+    user_id: profile.user_id ?? user.id,
+    name: user.name,
     email: user.email,
-    avatar_path: user.avatar_path,
-    headline: profile.headline,
-    bio_long: profile.bio_long,
-    rate_cents: profile.rate_cents,
-    rate_currency: profile.rate_currency,
-    meal_types: profile.meal_types,
-    service_area_center: profile.service_area_center,
-    service_radius_m: profile.service_radius_m,
-    verification_status: profile.verification_status,
+    is_seeker: user.is_seeker,
+    is_companion: user.is_companion,
+    account_verification_status: user.verification_status,
+    bio: profile.bio,
+    service_area: profile.service_area,
+    location: profile.location,
+    activities: normalizeActivities(profile.activities),
+    rates: normalizeRates(profile.rates),
+    photo_urls: normalizePhotos(profile.photo_urls),
+    rating_avg: profile.rating_avg,
     verified_at: profile.verified_at,
-    avg_rating: profile.avg_rating,
-    rating_count: profile.rating_count,
     created_at: profile.created_at,
-    updated_at: profile.updated_at,
   };
 }
 
 export function toPublicCompanionProfileDTO(
   profile: CompanionProfileRow,
-  user: Pick<UserRow, 'display_name' | 'avatar_path'>,
+  user: Pick<UserRow, 'id' | 'name'>,
   availability: AvailabilityRow[],
 ): PublicCompanionProfileDTO {
   return {
-    user_id: profile.user_id,
-    display_name: user.display_name,
-    avatar_path: user.avatar_path,
-    headline: profile.headline,
-    bio_long: profile.bio_long,
-    rate_cents: profile.rate_cents,
-    rate_currency: profile.rate_currency,
-    meal_types: profile.meal_types,
-    service_area_center: profile.service_area_center,
-    service_radius_m: profile.service_radius_m,
-    avg_rating: profile.avg_rating,
-    rating_count: profile.rating_count,
+    user_id: profile.user_id ?? user.id,
+    name: user.name,
+    bio: profile.bio,
+    service_area: profile.service_area,
+    location: profile.location,
+    activities: normalizeActivities(profile.activities),
+    rates: normalizeRates(profile.rates),
+    photo_urls: normalizePhotos(profile.photo_urls),
+    rating_avg: profile.rating_avg,
     availability: availability.map(toAvailabilityDTO),
   };
 }
@@ -123,10 +149,8 @@ export function toPublicCompanionProfileDTO(
 export function toAvailabilityDTO(row: AvailabilityRow): AvailabilityDTO {
   return {
     id: row.id,
-    day_of_week: row.day_of_week,
-    start_time: row.start_time,
-    end_time: row.end_time,
-    meal_type: row.meal_type,
-    timezone: row.timezone,
+    day_or_date: row.day_or_date,
+    time_range: row.time_range,
+    activity_types: row.activity_types ?? [],
   };
 }

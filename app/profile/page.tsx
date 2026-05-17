@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireSessionUser } from '@/lib/auth/session';
-import { avatarPublicUrl } from '@/lib/auth/storage';
 import { CompanionProfileSetup } from './CompanionProfileSetup';
 import styles from './styles.module.css';
 
@@ -30,8 +29,6 @@ export default async function CompanionProfilePage() {
     redirect('/mode');
   }
 
-  const avatarUrl = await avatarPublicUrl(user.profile.avatar_path ?? null);
-
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
@@ -40,32 +37,12 @@ export default async function CompanionProfilePage() {
           Tell seekers about you and where you can meet. Verification is required before seekers can
           find or book you.
         </p>
+        <p className={styles.helpText}>
+          <Link href="/verify" className={styles.photoLink}>
+            Identity & verification →
+          </Link>
+        </p>
       </header>
-
-      <section className={styles.card} aria-labelledby="photo-heading">
-        <h2 id="photo-heading" className={styles.cardHeading}>
-          Profile photo
-        </h2>
-        <p className={styles.cardSubhead}>The first thing seekers see on your profile.</p>
-        <div className={styles.photoRow}>
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="Your profile photo" className={styles.photoThumb} />
-          ) : (
-            <div className={styles.photoPlaceholder} aria-hidden>
-              No photo
-            </div>
-          )}
-          <div className={styles.photoMeta}>
-            <Link href="/verify" className={styles.photoLink}>
-              {avatarUrl ? 'Change photo' : 'Upload a photo'}
-            </Link>
-            <span className={styles.helpText}>
-              JPG, PNG, WEBP, or HEIC, up to 5 MB. Photos are uploaded from the verification screen.
-            </span>
-          </div>
-        </div>
-      </section>
 
       <CompanionProfileSetup />
     </main>

@@ -6,16 +6,14 @@
 //
 // Contract: see /app/api/profiles/CONTRACT.md.
 //
-// Authorization: all three methods require companion mode. Verification
-// status is NOT writable here - the Auth & Identity agent's verification
-// flow owns it (companion_profiles.verification_status). Verification
-// gating for discoverability is enforced by RLS on read paths.
+// Authorization: PUT/DELETE require companion mode. Verification status
+// is NOT writable here - Trust & Safety owns
+// `companion_profiles.verified_at` and `users.verification_status`.
+// Discovery gating for unverified companions is enforced by RLS.
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { requireAuth, requireCompanionMode } from '../_lib/auth';
-import { apiError } from '../_lib/errors';
-import { parseJsonBody } from '../_lib/parse';
+import { apiError, parseJsonBody, requireAuth, requireCompanionMode } from '@/app/api/_lib';
 import { toOwnCompanionProfileDTO, type OwnCompanionProfileDTO } from '../_lib/types';
 import { companionProfileUpsertSchema } from '../_lib/validators';
 import type { CompanionProfileRow, CompanionProfileUpdate, UserRow } from '@/lib/types';
@@ -40,11 +38,10 @@ export async function GET(): Promise<NextResponse> {
     return apiError('not_found', 'No companion profile yet.');
   }
 
-  const dto: OwnCompanionProfileDTO = toOwnCompanionProfileDTO(data as CompanionProfileRow, {
-    display_name: caller.profile.display_name,
-    email: caller.email || caller.profile.email,
-    avatar_path: caller.profile.avatar_path,
-  });
+  const dto: OwnCompanionProfileDTO = toOwnCompanionProfileDTO(
+    data as CompanionProfileRow,
+    caller.profile,
+  );
   return NextResponse.json({ profile: dto });
 }
 
@@ -59,8 +56,8 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
   // Read existing row to decide insert vs update. We avoid `.upsert()`
   // because it would let a caller silently overwrite owner-only columns
-  // (verification_status, stripe_connect_account_id, rating roll-up).
-  const { data: existingRaw, error: readErr } = await caller.supabase
+  // (verified_at, rating_avg) by sending them with the payload.
+  const { data: existing, error: readErr } = await caller.supabase
     .from('companion_profiles')
     .select('user_id')
     .eq('user_id', caller.userId)
@@ -70,23 +67,17 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     return apiError('internal_error', 'Could not load companion profile.');
   }
 
-  const writable: CompanionProfileUpdate = {
-    headline: input.headline,
-    bio_long: input.bio_long,
-    rate_cents: input.rate_cents,
-    rate_currency: input.rate_currency,
-    meal_types: input.meal_types,
-    // PostGIS geography(Point, 4326) accepts a GeoJSON Point payload via
-    // PostgREST; the column is declared as such in the frozen Database type.
-    service_area_center: input.service_area_center,
-    service_radius_m: input.service_radius_m,
-  };
+  const writable: CompanionProfileUpdate = {};
+  if (input.bio !== undefined) writable.bio = input.bio;
+  if (input.service_area !== undefined) writable.service_area = input.service_area;
+  if (input.location !== undefined) writable.location = input.location;
+  if (input.activities !== undefined) writable.activities = input.activities;
+  if (input.rates !== undefined) writable.rates = input.rates;
 
-  if (!existingRaw) {
-    const insertPayload: CompanionProfileUpdate & { user_id: string } = {
-      user_id: caller.userId,
-      ...writable,
-    };
+  const renderUser: UserRow = caller.profile;
+
+  if (!existing) {
+    const insertPayload = { user_id: caller.userId, ...writable };
     const { data: inserted, error: insertErr } = await caller.supabase
       .from('companion_profiles')
       .insert(insertPayload)
@@ -99,13 +90,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       );
     }
     return NextResponse.json(
-      {
-        profile: toOwnCompanionProfileDTO(inserted as CompanionProfileRow, {
-          display_name: caller.profile.display_name,
-          email: caller.email || caller.profile.email,
-          avatar_path: caller.profile.avatar_path,
-        }),
-      },
+      { profile: toOwnCompanionProfileDTO(inserted as CompanionProfileRow, renderUser) },
       { status: 201 },
     );
   }
@@ -120,11 +105,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     return apiError('internal_error', updErr?.message ?? 'Could not update companion profile.');
   }
   return NextResponse.json({
-    profile: toOwnCompanionProfileDTO(updated as CompanionProfileRow, {
-      display_name: (caller.profile as UserRow).display_name,
-      email: caller.email || (caller.profile as UserRow).email,
-      avatar_path: (caller.profile as UserRow).avatar_path,
-    }),
+    profile: toOwnCompanionProfileDTO(updated as CompanionProfileRow, renderUser),
   });
 }
 
@@ -133,9 +114,9 @@ export async function DELETE(): Promise<NextResponse> {
   if (!auth.ok) return auth.response;
   const { caller } = auth;
 
-  // Hard delete. ON DELETE CASCADE on `availability.companion_user_id`
-  // takes the windows with it. Bookings reference users.id, not the
-  // companion profile, so historical bookings are preserved.
+  // ON DELETE CASCADE on `availability.companion_profile_id` removes the
+  // windows. Bookings reference users.id (via the meal_requests chain),
+  // not the companion profile, so historical bookings survive.
   const { error } = await caller.supabase
     .from('companion_profiles')
     .delete()

@@ -1,10 +1,13 @@
 // RLS policy verification.
 //
 // Owner: QA & Testing agent. Source of truth: the policies declared in
-// supabase/migrations/20260515000600_rls.sql. The contract is "users
-// access only their own data; companion profiles discoverable only when
-// verified; messages visible only to booking participants" — these
-// tests pin every clause.
+// supabase/migrations/20260515000600_rls.sql. The contract is:
+//   - users access only their own row (verified companions visible too)
+//   - companion profiles discoverable only when verified_at is set
+//   - availability of unverified companions hidden from outsiders
+//   - messages, payments, bookings, meal_requests: participants-only
+//   - reviews: public-readable, insert gated on completed-booking
+//     participation
 //
 // Approach: spin up two unrelated test users, then prove that user B
 // cannot read or modify user A's rows except through the explicit
@@ -12,21 +15,16 @@
 // counterparties, etc.). The anon client is also used to verify that
 // a logged-out caller sees nothing at all.
 //
-// The booking-participant policies (messages, payments, cross-user
-// review insertion) cover behavior of tables the Core API and Payments
-// agents have not yet wired up, so they are flagged below and will be
-// fleshed out as those modules land. The current suite covers every
-// users / companion_profiles / availability policy.
-//
 // Skips automatically when TEST_SUPABASE_* env vars are not present.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { noTestSupabaseEnv } from '../_helpers/env';
 import { adminClient, anonClient } from '../_helpers/supabase-clients';
 import {
+  createCompanionProfile,
   createTestUser,
   deleteTestUsers,
-  createCompanionProfile,
+  setCompanionVerification,
   type TestUser,
 } from '../_helpers/test-users';
 
@@ -42,26 +40,38 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
   // A third user used to exercise verified-companion discovery from a
   // totally unrelated viewer.
   let viewerC: TestUser;
+  let companionAProfileId: string;
   const created: TestUser[] = [];
 
   beforeAll(async () => {
-    companionA = await createTestUser({ isCompanion: true, isSeeker: false, displayName: 'Alice' });
-    seekerB = await createTestUser({ isCompanion: false, isSeeker: true, displayName: 'Bob' });
-    viewerC = await createTestUser({ isCompanion: false, isSeeker: true, displayName: 'Carol' });
+    companionA = await createTestUser({
+      isCompanion: true,
+      isSeeker: false,
+      name: 'Alice',
+    });
+    seekerB = await createTestUser({
+      isCompanion: false,
+      isSeeker: true,
+      name: 'Bob',
+    });
+    viewerC = await createTestUser({
+      isCompanion: false,
+      isSeeker: true,
+      name: 'Carol',
+    });
     created.push(companionA, seekerB, viewerC);
     // Companion A has a profile + an availability window. Verification
-    // is left as 'unverified' so the default visibility tests reflect
+    // is left as unverified so the default visibility tests reflect
     // the most-restrictive (typical) state.
-    await createCompanionProfile(companionA);
+    const profile = await createCompanionProfile(companionA);
+    companionAProfileId = (profile as { id: string }).id;
     await adminClient()
       .from('availability')
       .insert({
-        companion_user_id: companionA.id,
-        day_of_week: 1,
-        start_time: '12:00',
-        end_time: '13:00',
-        meal_type: 'lunch',
-        timezone: 'UTC',
+        companion_profile_id: companionAProfileId,
+        day_or_date: 'Mon',
+        time_range: '12:00-13:00',
+        activity_types: ['lunch'],
       });
   });
 
@@ -86,10 +96,10 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
         .select('id')
         .eq('id', companionA.id)
         .maybeSingle();
-      expect(data).toBeNull(); // RLS hides the row from select.
+      expect(data).toBeNull();
     });
 
-    it('users_select_self: an anonymous caller cannot read any user row', async () => {
+    it('anonymous callers cannot read any user row', async () => {
       const anon = anonClient();
       const { data } = await anon.from('users').select('id').limit(1);
       expect(data ?? []).toEqual([]);
@@ -98,7 +108,7 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
     it('users_update_self: a user CANNOT update another user', async () => {
       const { data, error } = await seekerB.client
         .from('users')
-        .update({ display_name: 'Pwned' })
+        .update({ name: 'Pwned' })
         .eq('id', companionA.id)
         .select('id');
       // RLS produces a no-op (returns no rows), not an error.
@@ -108,14 +118,13 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
       // Confirm the actual row was untouched.
       const { data: confirmed } = await adminClient()
         .from('users')
-        .select('display_name')
+        .select('name')
         .eq('id', companionA.id)
         .maybeSingle();
-      expect((confirmed as { display_name: string } | null)?.display_name).toBe('Alice');
+      expect((confirmed as { name: string } | null)?.name).toBe('Alice');
     });
 
     it('users_select_verified_companion: verified companions become discoverable', async () => {
-      // Hidden while unverified.
       const before = await viewerC.client
         .from('users')
         .select('id')
@@ -123,28 +132,17 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
         .maybeSingle();
       expect(before.data).toBeNull();
 
-      // Promote Alice to verified via the admin client (mimics the
-      // Auth & Identity verification flow).
-      await adminClient()
-        .from('companion_profiles')
-        .update({
-          verification_status: 'verified',
-          verified_at: new Date().toISOString(),
-        })
-        .eq('user_id', companionA.id);
+      await setCompanionVerification(companionA.id, true);
 
       const after = await viewerC.client
         .from('users')
-        .select('id, display_name')
+        .select('id, name')
         .eq('id', companionA.id)
         .maybeSingle();
       expect(after.data).toMatchObject({ id: companionA.id });
 
       // Restore unverified state for downstream tests in this file.
-      await adminClient()
-        .from('companion_profiles')
-        .update({ verification_status: 'unverified', verified_at: null })
-        .eq('user_id', companionA.id);
+      await setCompanionVerification(companionA.id, false);
     });
   });
 
@@ -152,10 +150,11 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
     it('companion_profiles_select_self: owner sees own profile even when unverified', async () => {
       const { data } = await companionA.client
         .from('companion_profiles')
-        .select('user_id, verification_status')
+        .select('user_id, verified_at')
         .eq('user_id', companionA.id)
         .maybeSingle();
-      expect(data).toMatchObject({ user_id: companionA.id, verification_status: 'unverified' });
+      expect(data).toMatchObject({ user_id: companionA.id });
+      expect((data as { verified_at: string | null }).verified_at).toBeNull();
     });
 
     it('companion_profiles_select_verified: outsiders DO NOT see unverified profiles', async () => {
@@ -170,32 +169,30 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
     it('companion_profiles_insert_self: a user CANNOT create a profile for someone else', async () => {
       const { error } = await seekerB.client.from('companion_profiles').insert({
         user_id: companionA.id, // not the caller
-        rate_cents: 1500,
-        service_area_center: SF,
-        service_radius_m: 5000,
+        bio: 'pwn',
+        location: SF,
       });
       expect(error).not.toBeNull();
     });
 
-    it('companion_profiles_update_self: a user CANNOT update another user\'s profile', async () => {
+    it("companion_profiles_update_self: a user CANNOT update another user's profile", async () => {
       const { data, error } = await seekerB.client
         .from('companion_profiles')
-        .update({ rate_cents: 999 })
+        .update({ bio: 'pwn' })
         .eq('user_id', companionA.id)
         .select('user_id');
       expect(error).toBeNull();
       expect(data ?? []).toEqual([]);
 
-      // And the row is unchanged.
       const { data: confirmed } = await adminClient()
         .from('companion_profiles')
-        .select('rate_cents')
+        .select('bio')
         .eq('user_id', companionA.id)
         .maybeSingle();
-      expect((confirmed as { rate_cents: number } | null)?.rate_cents).not.toBe(999);
+      expect((confirmed as { bio: string } | null)?.bio).not.toBe('pwn');
     });
 
-    it('there is no DELETE policy for non-owners', async () => {
+    it('companion_profiles_delete: a non-owner cannot delete', async () => {
       const { data, error } = await seekerB.client
         .from('companion_profiles')
         .delete()
@@ -204,7 +201,6 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
       expect(error).toBeNull();
       expect(data ?? []).toEqual([]);
 
-      // Confirm Alice still has her profile.
       const { data: still } = await adminClient()
         .from('companion_profiles')
         .select('user_id')
@@ -219,7 +215,7 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
       const { data } = await companionA.client
         .from('availability')
         .select('id')
-        .eq('companion_user_id', companionA.id);
+        .eq('companion_profile_id', companionAProfileId);
       expect((data ?? []).length).toBeGreaterThan(0);
     });
 
@@ -227,28 +223,25 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
       const { data } = await viewerC.client
         .from('availability')
         .select('id')
-        .eq('companion_user_id', companionA.id);
+        .eq('companion_profile_id', companionAProfileId);
       expect(data ?? []).toEqual([]);
     });
 
     it('availability_insert_self: a user CANNOT add windows to another companion', async () => {
       const { error } = await seekerB.client.from('availability').insert({
-        companion_user_id: companionA.id,
-        day_of_week: 5,
-        start_time: '12:00',
-        end_time: '13:00',
-        meal_type: 'lunch',
-        timezone: 'UTC',
+        companion_profile_id: companionAProfileId,
+        day_or_date: 'Fri',
+        time_range: '12:00-13:00',
+        activity_types: ['lunch'],
       });
       expect(error).not.toBeNull();
     });
 
-    it('availability_update_self: a user CANNOT update another companion\'s window', async () => {
-      // Find one of Alice's windows via the admin client.
+    it("availability_update_self: a user CANNOT update another companion's window", async () => {
       const { data: rows } = await adminClient()
         .from('availability')
         .select('id')
-        .eq('companion_user_id', companionA.id)
+        .eq('companion_profile_id', companionAProfileId)
         .limit(1);
       const id = (rows as { id: string }[] | null)?.[0]?.id;
       expect(id).toBeDefined();
@@ -256,18 +249,18 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
 
       const { data, error } = await seekerB.client
         .from('availability')
-        .update({ start_time: '00:00', end_time: '01:00' })
+        .update({ time_range: '00:00-01:00' })
         .eq('id', id)
         .select('id');
       expect(error).toBeNull();
       expect(data ?? []).toEqual([]);
     });
 
-    it('availability_delete_self: a user CANNOT delete another companion\'s window', async () => {
+    it("availability_delete_self: a user CANNOT delete another companion's window", async () => {
       const { data: rows } = await adminClient()
         .from('availability')
         .select('id')
-        .eq('companion_user_id', companionA.id)
+        .eq('companion_profile_id', companionAProfileId)
         .limit(1);
       const id = (rows as { id: string }[] | null)?.[0]?.id;
       expect(id).toBeDefined();
@@ -281,7 +274,6 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
       expect(error).toBeNull();
       expect(data ?? []).toEqual([]);
 
-      // Confirm the row is still there.
       const { data: still } = await adminClient()
         .from('availability')
         .select('id')
@@ -292,26 +284,270 @@ describe.skipIf(noTestSupabaseEnv())('RLS: users / companion_profiles / availabi
   });
 });
 
-describe.skipIf(noTestSupabaseEnv())('RLS: messages, payments, bookings, reviews', () => {
-  // The Core API and Payments agents have not yet wired up requests,
-  // bookings, payments, messages, or reviews. The RLS policies for those
-  // tables are written and live in 20260515000600_rls.sql; their tests
-  // need data fixtures (a real booking participant pair) that only
-  // become possible once the bookings module lands. We assert here only
-  // that anonymous reads are blocked on those tables, which IS testable
-  // today — full participant-vs-non-participant tests will land alongside
-  // the bookings module in a later phase.
+describe.skipIf(noTestSupabaseEnv())(
+  'RLS: meal_requests / bookings / payments / messages / reviews',
+  () => {
+    // A verified seeker + verified companion pair, plus a third user
+    // (stranger) that should never see anything from their booking.
+    let seeker: TestUser;
+    let companion: TestUser;
+    let stranger: TestUser;
+    let requestId: string;
+    let bookingId: string;
+    const created: TestUser[] = [];
 
-  it('anonymous callers cannot read messages, payments, bookings, meal_requests, or reviews-by-id', async () => {
+    beforeAll(async () => {
+      seeker = await createTestUser({ isSeeker: true, name: 'SeekerS' });
+      companion = await createTestUser({ isCompanion: true, isSeeker: false, name: 'CompanionC' });
+      stranger = await createTestUser({ isSeeker: true, name: 'Stranger' });
+      created.push(seeker, companion, stranger);
+      await createCompanionProfile(companion, { verified: true });
+
+      // meal_requests insert via seeker JWT — RLS requires
+      // seeker_id = auth.uid().
+      const reqInsert = await seeker.client
+        .from('meal_requests')
+        .insert({
+          seeker_id: seeker.id,
+          companion_id: companion.id,
+          activity_type: 'lunch',
+          proposed_time: new Date(Date.now() + 86_400_000).toISOString(),
+          venue_name: 'Cafe Test',
+          venue_location: 'SF',
+          budget_tier: '$$',
+          message: 'lunch?',
+        })
+        .select('id')
+        .single();
+      requestId = (reqInsert.data as { id: string }).id;
+      expect(reqInsert.error).toBeNull();
+
+      // bookings insert is service-role-only by RLS (no client policy);
+      // we use admin to seed.
+      const bookInsert = await adminClient()
+        .from('bookings')
+        .insert({
+          request_id: requestId,
+          activity_type: 'lunch',
+          venue_name: 'Cafe Test',
+          venue_location: 'SF',
+          scheduled_time: new Date(Date.now() + 86_400_000).toISOString(),
+          budget_tier: '$$',
+          companion_fee: 25,
+        })
+        .select('id')
+        .single();
+      bookingId = (bookInsert.data as { id: string }).id;
+      expect(bookInsert.error).toBeNull();
+
+      // Seed a payment row (also service-role-only).
+      await adminClient().from('payments').insert({
+        booking_id: bookingId,
+        fee_amount: 25,
+        platform_cut: 5,
+      });
+    });
+
+    afterAll(async () => {
+      await deleteTestUsers(created);
+    });
+
+    describe('meal_requests', () => {
+      it('participants (seeker + companion) can read the request', async () => {
+        for (const u of [seeker, companion]) {
+          const { data } = await u.client
+            .from('meal_requests')
+            .select('id')
+            .eq('id', requestId)
+            .maybeSingle();
+          expect(data).toMatchObject({ id: requestId });
+        }
+      });
+
+      it('strangers CANNOT read the request', async () => {
+        const { data } = await stranger.client
+          .from('meal_requests')
+          .select('id')
+          .eq('id', requestId)
+          .maybeSingle();
+        expect(data).toBeNull();
+      });
+
+      it('a stranger CANNOT update status', async () => {
+        const { data, error } = await stranger.client
+          .from('meal_requests')
+          .update({ status: 'accepted' })
+          .eq('id', requestId)
+          .select('id');
+        expect(error).toBeNull();
+        expect(data ?? []).toEqual([]);
+      });
+
+      it('the seeker CANNOT update status (only the companion can)', async () => {
+        const { data, error } = await seeker.client
+          .from('meal_requests')
+          .update({ status: 'accepted' })
+          .eq('id', requestId)
+          .select('id');
+        expect(error).toBeNull();
+        expect(data ?? []).toEqual([]);
+      });
+    });
+
+    describe('bookings', () => {
+      it('participants can read the booking', async () => {
+        for (const u of [seeker, companion]) {
+          const { data } = await u.client
+            .from('bookings')
+            .select('id')
+            .eq('id', bookingId)
+            .maybeSingle();
+          expect(data).toMatchObject({ id: bookingId });
+        }
+      });
+
+      it('strangers cannot read the booking', async () => {
+        const { data } = await stranger.client
+          .from('bookings')
+          .select('id')
+          .eq('id', bookingId)
+          .maybeSingle();
+        expect(data).toBeNull();
+      });
+
+      it('no client INSERT policy: even a participant cannot create a booking via PostgREST', async () => {
+        const { error } = await seeker.client.from('bookings').insert({
+          request_id: requestId,
+          activity_type: 'dinner',
+          venue_name: 'X',
+          venue_location: 'Y',
+          scheduled_time: new Date().toISOString(),
+          budget_tier: '$',
+          companion_fee: 10,
+        });
+        expect(error).not.toBeNull();
+      });
+    });
+
+    describe('payments', () => {
+      it('participants can read their payment record', async () => {
+        for (const u of [seeker, companion]) {
+          const { data } = await u.client
+            .from('payments')
+            .select('booking_id, escrow_status')
+            .eq('booking_id', bookingId)
+            .maybeSingle();
+          expect(data).toMatchObject({ booking_id: bookingId, escrow_status: 'held' });
+        }
+      });
+
+      it('strangers cannot read the payment record', async () => {
+        const { data } = await stranger.client
+          .from('payments')
+          .select('booking_id')
+          .eq('booking_id', bookingId)
+          .maybeSingle();
+        expect(data).toBeNull();
+      });
+    });
+
+    describe('messages', () => {
+      it('a participant can post a message; a stranger cannot', async () => {
+        const ok = await seeker.client.from('messages').insert({
+          booking_id: bookingId,
+          sender_id: seeker.id,
+          body: 'see you there!',
+        });
+        expect(ok.error).toBeNull();
+
+        const blocked = await stranger.client.from('messages').insert({
+          booking_id: bookingId,
+          sender_id: stranger.id,
+          body: 'I am here too',
+        });
+        expect(blocked.error).not.toBeNull();
+      });
+
+      it('a participant cannot impersonate the other side (sender_id must match auth.uid)', async () => {
+        const { error } = await seeker.client.from('messages').insert({
+          booking_id: bookingId,
+          sender_id: companion.id, // impersonation
+          body: 'fake',
+        });
+        expect(error).not.toBeNull();
+      });
+
+      it('participants can read messages; strangers cannot', async () => {
+        for (const u of [seeker, companion]) {
+          const { data } = await u.client.from('messages').select('id').eq('booking_id', bookingId);
+          expect((data ?? []).length).toBeGreaterThanOrEqual(1);
+        }
+        const { data: strData } = await stranger.client
+          .from('messages')
+          .select('id')
+          .eq('booking_id', bookingId);
+        expect(strData ?? []).toEqual([]);
+      });
+    });
+
+    describe('reviews', () => {
+      it('reviews cannot be inserted before the booking is completed', async () => {
+        const { error } = await seeker.client.from('reviews').insert({
+          booking_id: bookingId,
+          reviewer_id: seeker.id,
+          reviewee_id: companion.id,
+          rating: 5,
+        });
+        expect(error).not.toBeNull();
+      });
+
+      it('a participant CAN insert a review once the booking is completed (and a non-participant cannot)', async () => {
+        // Mark the booking completed via admin to simulate the
+        // server-side completion flow.
+        await adminClient().from('bookings').update({ status: 'completed' }).eq('id', bookingId);
+
+        const ok = await seeker.client.from('reviews').insert({
+          booking_id: bookingId,
+          reviewer_id: seeker.id,
+          reviewee_id: companion.id,
+          rating: 5,
+          comment: 'great lunch',
+        });
+        expect(ok.error).toBeNull();
+
+        const blocked = await stranger.client.from('reviews').insert({
+          booking_id: bookingId,
+          reviewer_id: stranger.id,
+          reviewee_id: companion.id,
+          rating: 1,
+        });
+        expect(blocked.error).not.toBeNull();
+      });
+
+      it('reviews are publicly readable (no signed-in viewer required)', async () => {
+        const anon = anonClient();
+        const { error } = await anon.from('reviews').select('id').limit(1);
+        // Policy permits select; rows visible regardless of data.
+        expect(error).toBeNull();
+      });
+    });
+  },
+);
+
+describe.skipIf(noTestSupabaseEnv())('RLS: anonymous reads are blocked everywhere relevant', () => {
+  it('anon cannot read users, companion_profiles, availability, meal_requests, bookings, payments, messages', async () => {
     const anon = anonClient();
-    for (const table of ['messages', 'payments', 'bookings', 'meal_requests'] as const) {
+    for (const table of [
+      'users',
+      'companion_profiles',
+      'availability',
+      'meal_requests',
+      'bookings',
+      'payments',
+      'messages',
+    ] as const) {
       const { data } = await anon.from(table).select('*').limit(1);
       expect(data ?? []).toEqual([]);
     }
-    // reviews are publicly selectable by policy (so the discovery page
-    // can render ratings); confirm the policy is in fact permissive.
-    const reviews = await anon.from('reviews').select('id').limit(1);
-    // Empty data because no reviews exist yet, but no error either.
-    expect(reviews.error).toBeNull();
   });
 });

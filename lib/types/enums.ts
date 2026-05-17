@@ -2,69 +2,88 @@
 //
 // Owner: Database agent.
 //
-// These mirror the Postgres enums defined in
-// `supabase/migrations/20260515000100_init.sql`. They are the single
-// source of truth for status strings across the codebase: never compare
-// against ad-hoc strings - always import from here.
-//
-// When a Postgres enum value is added/removed, update this file in the
+// These mirror the CHECK constraints in `supabase/migrations/` exactly.
+// CLAUDE.md "Status enums" is the source of truth; this file is the TS
+// projection. When a CHECK constraint changes, update this file in the
 // same PR as the migration.
+//
+// Note: the Postgres schema models statuses as `text` with CHECK
+// constraints (not Postgres ENUM types). This file therefore declares
+// string-literal unions, not generated enum types.
 
-export type MealType = 'lunch' | 'dinner';
-export const MEAL_TYPES: readonly MealType[] = ['lunch', 'dinner'] as const;
+import type { ActivityType } from './activity';
 
-export type VerificationStatus =
-  | 'unverified'
-  | 'pending'
-  | 'verified'
-  | 'rejected';
+/** Re-export so importers can grab either `ActivityType` or the alias from one place. */
+export type { ActivityType } from './activity';
+export { ACTIVITY_TYPES, ACTIVITY_TYPE_META, isActivityType } from './activity';
 
-export type RequestStatus =
-  | 'requested'
-  | 'accepted'
-  | 'declined'
-  | 'cancelled'
-  | 'expired';
+/** meal_requests.status — lifecycle ends here or in bookings.status. */
+export type RequestStatus = 'requested' | 'accepted' | 'declined';
 
-export type BookingStatus =
-  | 'accepted'
-  | 'confirmed'
-  | 'completed'
-  | 'cancelled';
+export const REQUEST_STATUSES: readonly RequestStatus[] = [
+  'requested',
+  'accepted',
+  'declined',
+] as const;
 
-export type BudgetTier = 'low' | 'medium' | 'high';
+/** bookings.status — post-acceptance lifecycle. */
+export type BookingStatus = 'confirmed' | 'completed' | 'cancelled';
 
-export type PaymentStatus =
-  | 'pending'
-  | 'requires_action'
-  | 'authorized'
-  | 'captured'
-  | 'released'
-  | 'refunded'
-  | 'failed';
+export const BOOKING_STATUSES: readonly BookingStatus[] = [
+  'confirmed',
+  'completed',
+  'cancelled',
+] as const;
 
-export type EscrowStatus = 'pending' | 'held' | 'released' | 'refunded';
+/** payments.escrow_status — companionship fee custody. */
+export type EscrowStatus = 'held' | 'released' | 'refunded';
 
-export type MessageType = 'user' | 'system';
+export const ESCROW_STATUSES: readonly EscrowStatus[] = ['held', 'released', 'refunded'] as const;
 
-export type ReviewSubjectType = 'companion' | 'seeker';
+/** users.verification_status — seeker-side identity gate. */
+export type VerificationStatus = 'unverified' | 'pending' | 'verified';
 
-export type CancellationParty = 'seeker' | 'companion' | 'system';
+export const VERIFICATION_STATUSES: readonly VerificationStatus[] = [
+  'unverified',
+  'pending',
+  'verified',
+] as const;
 
-// Booking lifecycle transitions allowed by the product spec. The Core API
-// is the authoritative enforcer; this map exists so the frontend can pre-
-// validate UI state.
-export const BOOKING_NEXT_STATES: Record<BookingStatus, readonly BookingStatus[]> = {
-  accepted: ['confirmed', 'cancelled'],
+/** Seeker-chosen activity-cost cap (CLAUDE.md core product rule #5). */
+export type BudgetTier = '$' | '$$' | '$$$';
+
+export const BUDGET_TIERS: readonly BudgetTier[] = ['$', '$$', '$$$'] as const;
+
+// ---------------------------------------------------------------------------
+// Allowed lifecycle transitions
+// ---------------------------------------------------------------------------
+// Authoritative enforcement lives in the Core API; this map is exported so
+// the frontend can pre-validate UI state without round-tripping.
+
+/**
+ * meal_requests.status transitions:
+ *   requested -> accepted | declined
+ *   accepted / declined are terminal (acceptance spawns a bookings row;
+ *   subsequent state is on the booking, not the request).
+ */
+export const REQUEST_NEXT_STATES: Readonly<Record<RequestStatus, readonly RequestStatus[]>> = {
+  requested: ['accepted', 'declined'],
+  accepted: [],
+  declined: [],
+} as const;
+
+/**
+ * bookings.status transitions:
+ *   confirmed -> completed | cancelled
+ *   completed / cancelled are terminal.
+ *
+ *   completed  -> escrow releases, reviews unlock (core product rules #7, #9).
+ *   cancelled  -> escrow refunds.
+ */
+export const BOOKING_NEXT_STATES: Readonly<Record<BookingStatus, readonly BookingStatus[]>> = {
   confirmed: ['completed', 'cancelled'],
   completed: [],
   cancelled: [],
 } as const;
 
-export const REQUEST_NEXT_STATES: Record<RequestStatus, readonly RequestStatus[]> = {
-  requested: ['accepted', 'declined', 'cancelled', 'expired'],
-  accepted: [],
-  declined: [],
-  cancelled: [],
-  expired: [],
-} as const;
+export type Activity = ActivityType;

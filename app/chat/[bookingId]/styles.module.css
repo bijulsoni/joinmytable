@@ -1,0 +1,164 @@
+/* /chat/[bookingId] - in-app messaging. */
+
+.shell {
+  min-height: 100dvh;
+  background: var(--color-background);
+  display: flex;
+  flex-direction: column;
+}
+
+.summary {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.75rem 1rem;
+  z-index: 5;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.summaryBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.summaryName {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.summaryMeta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.summaryBack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.thread {
+  flex: 1;
+  padding: 1rem 1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+.message {
+  max-width: 78%;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.sent {
+  align-self: flex-end;
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.received {
+  align-self: flex-start;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.system {
+  align-self: center;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  text-align: center;
+  padding: 0.25rem 0.75rem;
+  max-width: 90%;
+}
+
+.timestamp {
+  margin: 0.125rem 0.25rem 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+}
+
+.timestampRight {
+  align-self: flex-end;
+}
+
+.timestampLeft {
+  align-self: flex-start;
+}
+
+.composer {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem calc(0.5rem + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.composerField {
+  flex: 1;
+  appearance: none;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-background);
+  border-radius: var(--radius-lg);
+  padding: 0.625rem 0.875rem;
+  font-size: 1rem;
+  min-height: 44px;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.3;
+  max-height: 8rem;
+}
+
+.composerField:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.sendButton {
+  appearance: none;
+  border: 0;
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-pill);
+  padding: 0 0.875rem;
+  height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9375rem;
+}
+
+.sendButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.empty {
+  padding: 2rem 1.25rem;
+}

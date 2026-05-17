@@ -3,7 +3,6 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { reconcileSeekerVerification } from '@/lib/auth/verification';
 import { logger } from '@/lib/logger';
 
 const log = logger.child({ module: 'auth.login' });
@@ -42,11 +41,6 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
       message: error?.message ?? 'Sign in failed. Check your email and password.',
     };
   }
-
-  // Recompute the seeker-side verification gate now that we know the
-  // user just authenticated successfully (email may have been confirmed
-  // between sign-up and login).
-  await reconcileSeekerVerification(data.user.id);
 
   redirect('/');
 }

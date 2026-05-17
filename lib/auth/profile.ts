@@ -11,10 +11,9 @@ import type { UserRow, UserUpdate } from '@/lib/types';
 export interface CreateMirrorRowInput {
   authUserId: string;
   email: string;
-  displayName: string;
+  name: string;
   isSeeker: boolean;
   isCompanion: boolean;
-  acceptedGuidelines: boolean;
 }
 
 /**
@@ -29,24 +28,21 @@ export async function createUserMirrorRow(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = authAdminClient();
 
-  // Enforce the schema constraint client-side too so we return a clean
-  // error instead of leaking the Postgres message.
   if (!input.isSeeker && !input.isCompanion) {
     return { ok: false, error: 'Pick at least one mode.' };
   }
-  const displayName = input.displayName.trim();
-  if (displayName.length < 1 || displayName.length > 80) {
-    return { ok: false, error: 'Display name must be 1-80 characters.' };
+  const name = input.name.trim();
+  if (name.length < 1 || name.length > 80) {
+    return { ok: false, error: 'Name must be 1-80 characters.' };
   }
 
   const { error } = await admin.from('users').upsert(
     {
       id: input.authUserId,
       email: input.email,
-      display_name: displayName,
+      name,
       is_seeker: input.isSeeker,
       is_companion: input.isCompanion,
-      guidelines_accepted_at: input.acceptedGuidelines ? new Date().toISOString() : null,
     } satisfies Partial<UserRow>,
     { onConflict: 'id' },
   );
@@ -60,8 +56,7 @@ export async function createUserMirrorRow(
 /**
  * Toggle one of the mode flags for the signed-in user. Runs through the
  * request-scoped client so RLS confirms the caller may only update their
- * own row. Refuses to clear both flags (mirrors the
- * `users_at_least_one_mode` check constraint).
+ * own row. Refuses to clear both flags.
  */
 export async function updateUserModes(input: {
   isSeeker: boolean;
@@ -92,23 +87,4 @@ export async function updateUserModes(input: {
     return { ok: false, error: error?.message ?? 'Update failed.' };
   }
   return { ok: true, profile: data as UserRow };
-}
-
-/**
- * Record acceptance of the community guidelines. Trust & Safety owns
- * the guidelines copy; this is the timestamp side-effect that gates
- * marketplace participation.
- */
-export async function acceptGuidelines(): Promise<{ ok: true } | { ok: false; error: string }> {
-  const supabase = await authServerClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return { ok: false, error: 'Not signed in.' };
-
-  const update: UserUpdate = {
-    guidelines_accepted_at: new Date().toISOString(),
-  };
-  const { error } = await supabase.from('users').update(update).eq('id', auth.user.id);
-
-  if (error) return { ok: false, error: error.message };
-  return { ok: true };
 }

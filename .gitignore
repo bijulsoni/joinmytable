@@ -49,3 +49,7 @@ yarn-error.log*
 # supabase local
 supabase/.branches
 supabase/.temp
+
+# claude code runtime state + multi-agent logs
+.claude/
+orchestration-logs/

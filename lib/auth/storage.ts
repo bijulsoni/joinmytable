@@ -21,7 +21,6 @@ import 'server-only';
 
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 import { authServerClient } from './db';
-import type { UserUpdate } from '@/lib/types';
 
 export const AVATAR_BUCKET = 'avatars';
 export const VERIFICATION_BUCKET = 'verification';
@@ -103,10 +102,10 @@ async function uploadBlob(input: UploadInput): Promise<StorageUploadResult | Sto
 }
 
 /**
- * Upload the signed-in user's avatar. Writes under
- * `<userId>/avatar-<ts>.<ext>` so previous uploads remain addressable
- * for audit and re-rendering. Updates `users.avatar_path` to the new
- * key on success.
+ * Upload the signed-in user's avatar to Storage. Returns the object key
+ * on success. The new schema has no avatar column on `users`; companion
+ * profile photos live in `companion_profiles.photo_urls` and are written
+ * by the Core API on profile update.
  */
 export async function uploadAvatar(file: Blob): Promise<StorageUploadResult | StorageUploadError> {
   const supabase = await authServerClient();
@@ -116,7 +115,7 @@ export async function uploadAvatar(file: Blob): Promise<StorageUploadResult | St
   const ext = mimeToExt(file.type);
   const objectKey = `${auth.user.id}/avatar-${Date.now()}.${ext}`;
 
-  const result = await uploadBlob({
+  return uploadBlob({
     bucket: AVATAR_BUCKET,
     objectKey,
     file,
@@ -124,13 +123,6 @@ export async function uploadAvatar(file: Blob): Promise<StorageUploadResult | St
     upsert: true,
     maxBytes: AVATAR_MAX_BYTES,
   });
-  if (!result.ok) return result;
-
-  const update: UserUpdate = { avatar_path: result.path };
-  const { error: updErr } = await supabase.from('users').update(update).eq('id', auth.user.id);
-  if (updErr) return { ok: false, error: updErr.message };
-
-  return result;
 }
 
 /**

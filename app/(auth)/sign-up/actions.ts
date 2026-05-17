@@ -3,8 +3,7 @@
 // Server action backing the sign-up form. Steps:
 //   1. Validate the payload (zod).
 //   2. Call Supabase Auth signUp (email + password).
-//   3. Insert the public.users mirror row with the chosen modes and
-//      community guidelines acceptance.
+//   3. Insert the public.users mirror row with the chosen modes.
 //   4. If a session was returned (email confirmation disabled), redirect
 //      to the verification screen so the seeker/companion can finish
 //      setup; otherwise route to a "check your inbox" notice.
@@ -13,7 +12,6 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createUserMirrorRow } from '@/lib/auth/profile';
-import { reconcileSeekerVerification } from '@/lib/auth/verification';
 import { logger } from '@/lib/logger';
 
 const log = logger.child({ module: 'auth.sign-up' });
@@ -25,10 +23,7 @@ const SignUpSchema = z
       .string()
       .min(8, 'Password must be at least 8 characters.')
       .max(72, 'Password is too long.'),
-    displayName: z
-      .string()
-      .min(1, 'Display name is required.')
-      .max(80, 'Display name is too long.'),
+    name: z.string().min(1, 'Name is required.').max(80, 'Name is too long.'),
     isSeeker: z.boolean(),
     isCompanion: z.boolean(),
     acceptGuidelines: z
@@ -48,7 +43,7 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
       .trim()
       .toLowerCase(),
     password: String(formData.get('password') ?? ''),
-    displayName: String(formData.get('displayName') ?? '').trim(),
+    name: String(formData.get('name') ?? '').trim(),
     isSeeker: formData.get('isSeeker') === 'on',
     isCompanion: formData.get('isCompanion') === 'on',
     acceptGuidelines: formData.get('acceptGuidelines') === 'on',
@@ -66,7 +61,7 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      data: { display_name: parsed.data.displayName },
+      data: { name: parsed.data.name },
     },
   });
 
@@ -81,22 +76,16 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
   const mirror = await createUserMirrorRow({
     authUserId: authResult.user.id,
     email: parsed.data.email,
-    displayName: parsed.data.displayName,
+    name: parsed.data.name,
     isSeeker: parsed.data.isSeeker,
     isCompanion: parsed.data.isCompanion,
-    acceptedGuidelines: true,
   });
   if (!mirror.ok) {
     log.error({ err: mirror.error }, 'mirror row insert failed');
     return { status: 'error', message: mirror.error };
   }
 
-  if (parsed.data.isSeeker) {
-    await reconcileSeekerVerification(authResult.user.id);
-  }
-
   if (authResult.session) {
-    // Session created (email confirmation disabled for this project).
     redirect('/verify');
   }
   redirect('/check-email');

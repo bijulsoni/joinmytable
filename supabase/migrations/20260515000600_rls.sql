@@ -2,36 +2,33 @@
 -- Row Level Security policies.
 -- Owner: Database agent.
 --
--- High-level access model:
---   - users:              own row; basic fields readable when the user is
---                         a verified companion (for discovery); booking
---                         counterparties can see each other.
---   - companion_profiles: own row CRUD; verified rows publicly readable.
---   - availability:       own row CRUD; verified-companion availability
---                         publicly readable (drives discovery filters).
---   - meal_requests:      participants only; seeker creates, companion
---                         responds, application enforces transitions.
---   - bookings:           participants only; writes constrained to
---                         participants (transition guards live in API).
---   - payments:           participants may read; only the service role
---                         (Payments agent's server code) may write.
---   - messages:           booking participants may read; user messages
---                         must be authored by a participant; system
---                         messages are service-role only.
---   - reviews:            publicly readable (so companion profiles show
---                         them); authors must be participants of a
---                         COMPLETED booking and may only write themselves.
+-- Policy summary (matches agents/agent-database.md section 4):
+--   - users:              read/update only own row.
+--   - companion_profiles: verified rows publicly readable; owner-only
+--                         insert/update/delete.
+--   - availability:       verified-companion availability publicly readable;
+--                         owner-only insert/update/delete.
+--   - meal_requests:      seeker + companion can read; seeker creates;
+--                         only the companion can update status.
+--   - bookings:           only participants (seeker via the originating
+--                         request, companion via the originating request)
+--                         can read/update; no client inserts.
+--   - payments:           only the booking's seeker and companion can read;
+--                         no client inserts (service role only).
+--   - messages:           only the booking's participants can read/insert.
+--   - reviews:            anyone can read; only the reviewer (a participant
+--                         of a completed booking) can insert; no updates.
 --
--- All status-transition rules (request -> accepted, booking -> completed,
--- escrow release, etc.) live in the API layer, NOT in RLS. RLS is a
--- last-line authorization fence; the Core API is the enforcer of
--- business rules per CLAUDE.md.
+-- The Core API enforces business-rule transitions (e.g. only the seeker
+-- can cancel a request that is still 'requested'). RLS is the last-line
+-- authorization fence.
 
 -- ---------------------------------------------------------------------------
 -- Helper: is the caller a participant of the given booking?
 -- ---------------------------------------------------------------------------
--- security definer so the function can see the bookings row even when the
--- caller's RLS would otherwise restrict the lookup.
+-- security definer so the function can resolve the booking <-> request
+-- chain even when the caller's RLS would otherwise hide intermediate
+-- rows. Used by payments, messages, and bookings policies.
 create or replace function public.is_booking_participant(p_booking_id uuid)
 returns boolean
 language sql
@@ -42,8 +39,9 @@ as $$
   select exists (
     select 1
     from public.bookings b
+    join public.meal_requests r on r.id = b.request_id
     where b.id = p_booking_id
-      and (b.seeker_user_id = auth.uid() or b.companion_user_id = auth.uid())
+      and (r.seeker_id = auth.uid() or r.companion_id = auth.uid())
   );
 $$;
 
@@ -60,30 +58,17 @@ create policy users_select_self
   on public.users for select
   using (id = auth.uid());
 
--- Verified companions are discoverable; their user row needs to be
--- readable so the discovery list can render name + avatar.
+-- Verified companions need their users row visible so discovery can show
+-- name + email-derived identicons. Limited to rows backed by a verified
+-- companion profile.
 drop policy if exists users_select_verified_companion on public.users;
 create policy users_select_verified_companion
   on public.users for select
   using (
     exists (
-      select 1
-      from public.companion_profiles cp
+      select 1 from public.companion_profiles cp
       where cp.user_id = public.users.id
-        and cp.verification_status = 'verified'
-    )
-  );
-
--- Booking counterparties can see each other (after a request is accepted).
-drop policy if exists users_select_booking_counterparty on public.users;
-create policy users_select_booking_counterparty
-  on public.users for select
-  using (
-    exists (
-      select 1
-      from public.bookings b
-      where (b.seeker_user_id = auth.uid() and b.companion_user_id = public.users.id)
-         or (b.companion_user_id = auth.uid() and b.seeker_user_id = public.users.id)
+        and cp.verified_at is not null
     )
   );
 
@@ -98,40 +83,42 @@ create policy users_update_self
   using (id = auth.uid())
   with check (id = auth.uid());
 
--- No DELETE policy: hard-delete is service-role only; user-initiated
--- removal sets deleted_at via the API.
+-- No DELETE policy: account removal is service-role.
 
 -- ---------------------------------------------------------------------------
 -- companion_profiles
 -- ---------------------------------------------------------------------------
 alter table public.companion_profiles enable row level security;
 
+-- Owner can always see their own profile (verified or not).
 drop policy if exists companion_profiles_select_self on public.companion_profiles;
 create policy companion_profiles_select_self
   on public.companion_profiles for select
   using (user_id = auth.uid());
 
--- Public discoverability gate: ONLY verified profiles are visible to
--- anyone other than the owner. Core product rule #9.
+-- Public discoverability gate: only verified profiles
+-- (verified_at IS NOT NULL) are visible to anyone other than the owner.
+-- Core product rule #10.
 drop policy if exists companion_profiles_select_verified on public.companion_profiles;
 create policy companion_profiles_select_verified
   on public.companion_profiles for select
-  using (verification_status = 'verified');
+  using (verified_at is not null);
 
 drop policy if exists companion_profiles_insert_self on public.companion_profiles;
 create policy companion_profiles_insert_self
   on public.companion_profiles for insert
   with check (user_id = auth.uid());
 
--- The owner can update profile fields. verification_status is intended to
--- be moved by the Auth & Identity agent's verification flow (which will
--- run with elevated privileges); the owner cannot legally self-verify in
--- the application even though RLS does not block the column write itself.
 drop policy if exists companion_profiles_update_self on public.companion_profiles;
 create policy companion_profiles_update_self
   on public.companion_profiles for update
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+drop policy if exists companion_profiles_delete_self on public.companion_profiles;
+create policy companion_profiles_delete_self
+  on public.companion_profiles for delete
+  using (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- availability
@@ -141,34 +128,65 @@ alter table public.availability enable row level security;
 drop policy if exists availability_select_self on public.availability;
 create policy availability_select_self
   on public.availability for select
-  using (companion_user_id = auth.uid());
+  using (
+    exists (
+      select 1 from public.companion_profiles cp
+      where cp.id = public.availability.companion_profile_id
+        and cp.user_id = auth.uid()
+    )
+  );
 
+-- Public availability for verified companions only.
 drop policy if exists availability_select_public_verified on public.availability;
 create policy availability_select_public_verified
   on public.availability for select
   using (
     exists (
       select 1 from public.companion_profiles cp
-      where cp.user_id = public.availability.companion_user_id
-        and cp.verification_status = 'verified'
+      where cp.id = public.availability.companion_profile_id
+        and cp.verified_at is not null
     )
   );
 
 drop policy if exists availability_insert_self on public.availability;
 create policy availability_insert_self
   on public.availability for insert
-  with check (companion_user_id = auth.uid());
+  with check (
+    exists (
+      select 1 from public.companion_profiles cp
+      where cp.id = public.availability.companion_profile_id
+        and cp.user_id = auth.uid()
+    )
+  );
 
 drop policy if exists availability_update_self on public.availability;
 create policy availability_update_self
   on public.availability for update
-  using (companion_user_id = auth.uid())
-  with check (companion_user_id = auth.uid());
+  using (
+    exists (
+      select 1 from public.companion_profiles cp
+      where cp.id = public.availability.companion_profile_id
+        and cp.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.companion_profiles cp
+      where cp.id = public.availability.companion_profile_id
+        and cp.user_id = auth.uid()
+    )
+  );
 
 drop policy if exists availability_delete_self on public.availability;
 create policy availability_delete_self
   on public.availability for delete
-  using (companion_user_id = auth.uid());
+  using (
+    exists (
+      select 1 from public.companion_profiles cp
+      where cp.id = public.availability.companion_profile_id
+        and cp.user_id = auth.uid()
+    )
+  );
 
 -- ---------------------------------------------------------------------------
 -- meal_requests
@@ -178,23 +196,22 @@ alter table public.meal_requests enable row level security;
 drop policy if exists meal_requests_select_participant on public.meal_requests;
 create policy meal_requests_select_participant
   on public.meal_requests for select
-  using (seeker_user_id = auth.uid() or companion_user_id = auth.uid());
+  using (seeker_id = auth.uid() or companion_id = auth.uid());
 
--- A request can only be created by the seeker. The Core API additionally
--- verifies that the target companion is verified.
+-- Only the seeker can create a request. The Core API additionally checks
+-- the target companion is verified before allowing the insert.
 drop policy if exists meal_requests_insert_seeker on public.meal_requests;
 create policy meal_requests_insert_seeker
   on public.meal_requests for insert
-  with check (seeker_user_id = auth.uid());
+  with check (seeker_id = auth.uid());
 
--- Either participant may update; the Core API enforces which transitions
--- they are allowed (e.g. only the companion may move to 'accepted'/'declined',
--- only the seeker may move to 'cancelled' while still 'requested').
-drop policy if exists meal_requests_update_participant on public.meal_requests;
-create policy meal_requests_update_participant
+-- Only the companion can update (to set status accepted/declined).
+-- Seeker-initiated cancellation lives on bookings, not here.
+drop policy if exists meal_requests_update_companion on public.meal_requests;
+create policy meal_requests_update_companion
   on public.meal_requests for update
-  using (seeker_user_id = auth.uid() or companion_user_id = auth.uid())
-  with check (seeker_user_id = auth.uid() or companion_user_id = auth.uid());
+  using (companion_id = auth.uid())
+  with check (companion_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- bookings
@@ -204,31 +221,29 @@ alter table public.bookings enable row level security;
 drop policy if exists bookings_select_participant on public.bookings;
 create policy bookings_select_participant
   on public.bookings for select
-  using (seeker_user_id = auth.uid() or companion_user_id = auth.uid());
+  using (public.is_booking_participant(id));
 
 -- INSERT is service-role only: a booking is created server-side by the
--- Core API when a request is accepted. No anon/authenticated INSERT policy.
+-- Core API when a request is accepted.
 
 drop policy if exists bookings_update_participant on public.bookings;
 create policy bookings_update_participant
   on public.bookings for update
-  using (seeker_user_id = auth.uid() or companion_user_id = auth.uid())
-  with check (seeker_user_id = auth.uid() or companion_user_id = auth.uid());
+  using (public.is_booking_participant(id))
+  with check (public.is_booking_participant(id));
 
 -- ---------------------------------------------------------------------------
 -- payments
 -- ---------------------------------------------------------------------------
 alter table public.payments enable row level security;
 
--- Participants of the booking can read their own payment record (so the
--- Frontend can show "fee in escrow" / "fee released").
+-- Participants of the underlying booking may read their payment record
+-- ("fee in escrow" / "fee released" UI). No client writes - the Payments
+-- agent's server code (service role) owns this table.
 drop policy if exists payments_select_participant on public.payments;
 create policy payments_select_participant
   on public.payments for select
   using (public.is_booking_participant(booking_id));
-
--- No INSERT/UPDATE/DELETE policies: payments are written exclusively by
--- the Payments agent's server-side code via the service role.
 
 -- ---------------------------------------------------------------------------
 -- messages
@@ -240,15 +255,15 @@ create policy messages_select_participant
   on public.messages for select
   using (public.is_booking_participant(booking_id));
 
--- Authenticated users may INSERT 'user' messages, but only into bookings
--- they participate in, and only as themselves. System messages are
--- service-role only (sender_user_id is null, blocked here).
+-- Authenticated users may insert their own (non-system) messages into
+-- bookings they participate in. System messages (is_system_message =
+-- true, sender_id null) are service-role only and rejected here.
 drop policy if exists messages_insert_participant on public.messages;
 create policy messages_insert_participant
   on public.messages for insert
   with check (
-    message_type = 'user'
-    and sender_user_id = auth.uid()
+    is_system_message is not true
+    and sender_id = auth.uid()
     and public.is_booking_participant(booking_id)
   );
 
@@ -259,44 +274,33 @@ create policy messages_insert_participant
 -- ---------------------------------------------------------------------------
 alter table public.reviews enable row level security;
 
--- Reviews are public so they can render on companion profile pages.
+-- Reviews are public (per CLAUDE.md task spec): they render on companion
+-- profile pages.
 drop policy if exists reviews_select_public on public.reviews;
 create policy reviews_select_public
   on public.reviews for select
   using (true);
 
--- A review can only be authored by:
---   - the caller (author_user_id = auth.uid())
---   - on a booking they participated in
---   - that is 'completed'
---   - against the other party (subject is the counterparty, with the
---     correct subject_type)
+-- A review may only be inserted by the reviewer themselves, against the
+-- counterparty of a COMPLETED booking they participated in
+-- (core product rule #9).
 drop policy if exists reviews_insert_completed_participant on public.reviews;
 create policy reviews_insert_completed_participant
   on public.reviews for insert
   with check (
-    author_user_id = auth.uid()
+    reviewer_id = auth.uid()
     and exists (
       select 1
       from public.bookings b
+      join public.meal_requests r on r.id = b.request_id
       where b.id = reviews.booking_id
         and b.status = 'completed'
         and (
-          (b.seeker_user_id = auth.uid()
-            and reviews.subject_user_id = b.companion_user_id
-            and reviews.subject_type = 'companion')
+          (r.seeker_id = auth.uid()    and reviews.reviewee_id = r.companion_id)
           or
-          (b.companion_user_id = auth.uid()
-            and reviews.subject_user_id = b.seeker_user_id
-            and reviews.subject_type = 'seeker')
+          (r.companion_id = auth.uid() and reviews.reviewee_id = r.seeker_id)
         )
     )
   );
 
--- Allow authors to edit their own review body/rating. Subject + booking
--- cannot be changed (enforced by re-evaluating with_check).
-drop policy if exists reviews_update_author on public.reviews;
-create policy reviews_update_author
-  on public.reviews for update
-  using (author_user_id = auth.uid())
-  with check (author_user_id = auth.uid());
+-- No UPDATE / DELETE policies: reviews are immutable per the task spec.

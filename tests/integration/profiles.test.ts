@@ -12,18 +12,25 @@
 //
 // Skips automatically when TEST_SUPABASE_* env vars are not present.
 // See tests/_helpers/env.ts for the contract.
+//
+// Schema reference (phase 1 v2, see CLAUDE.md):
+//   - companion_profiles: bio, service_area, location (Point),
+//     activities (jsonb), rates (jsonb), photo_urls (text[]), verified_at
+//   - availability: companion_profile_id, day_or_date, time_range,
+//     activity_types (text[])
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { noTestSupabaseEnv } from '../_helpers/env';
 import { adminClient } from '../_helpers/supabase-clients';
 import {
+  createCompanionProfile,
   createTestUser,
   deleteTestUsers,
-  createCompanionProfile,
+  setCompanionVerification,
   type TestUser,
 } from '../_helpers/test-users';
 
-const SAN_FRANCISCO = { type: 'Point' as const, coordinates: [-122.4194, 37.7749] };
+const SF = { type: 'Point' as const, coordinates: [-122.4194, 37.7749] };
 
 describe.skipIf(noTestSupabaseEnv())('integration: /api/profiles (data layer)', () => {
   const created: TestUser[] = [];
@@ -32,6 +39,9 @@ describe.skipIf(noTestSupabaseEnv())('integration: /api/profiles (data layer)', 
     await deleteTestUsers(created);
   });
 
+  // -------------------------------------------------------------------
+  // PUT /api/profiles/me — companion profile upsert
+  // -------------------------------------------------------------------
   describe('PUT /api/profiles/me — companion profile upsert', () => {
     let companion: TestUser;
     beforeAll(async () => {
@@ -39,67 +49,63 @@ describe.skipIf(noTestSupabaseEnv())('integration: /api/profiles (data layer)', 
       created.push(companion);
     });
 
-    it('creates the row on first write (insert path)', async () => {
+    it('creates the row on first write with all four activity types', async () => {
       const { data, error } = await companion.client
         .from('companion_profiles')
         .insert({
           user_id: companion.id,
-          headline: 'Hello',
-          rate_cents: 2500,
-          rate_currency: 'USD',
-          meal_types: ['lunch', 'dinner'],
-          service_area_center: SAN_FRANCISCO,
-          service_radius_m: 5000,
+          bio: 'Hello',
+          service_area: 'SF',
+          location: SF,
+          activities: { lunch: true, dinner: true, coffee: true, happy_hour: true },
+          rates: { lunch: 22, dinner: 25, coffee: 12, happy_hour: 20 },
         })
-        .select('user_id, rate_cents, verification_status')
+        .select('user_id, activities, rates, verified_at')
         .single();
       expect(error).toBeNull();
       expect(data).toMatchObject({
         user_id: companion.id,
-        rate_cents: 2500,
-        verification_status: 'unverified',
+        activities: { lunch: true, dinner: true, coffee: true, happy_hour: true },
+        rates: { lunch: 22, dinner: 25, coffee: 12, happy_hour: 20 },
+        verified_at: null, // newly created profiles are unverified
       });
     });
 
-    it('rejects rate_cents below the CHECK lower bound', async () => {
-      const { error } = await companion.client
-        .from('companion_profiles')
-        .update({ rate_cents: 100 })
-        .eq('user_id', companion.id);
-      expect(error).not.toBeNull();
-    });
-
-    it('rejects rate_cents above the CHECK upper bound', async () => {
-      const { error } = await companion.client
-        .from('companion_profiles')
-        .update({ rate_cents: 50_000 })
-        .eq('user_id', companion.id);
-      expect(error).not.toBeNull();
-    });
-
-    it('rejects service_radius_m outside [500, 100_000]', async () => {
-      const tooSmall = await companion.client
-        .from('companion_profiles')
-        .update({ service_radius_m: 100 })
-        .eq('user_id', companion.id);
-      expect(tooSmall.error).not.toBeNull();
-
-      const tooBig = await companion.client
-        .from('companion_profiles')
-        .update({ service_radius_m: 1_000_000 })
-        .eq('user_id', companion.id);
-      expect(tooBig.error).not.toBeNull();
-    });
-
-    it('updates writable fields (update path)', async () => {
+    it('lets the owner update rates for individual activity types', async () => {
       const { data, error } = await companion.client
         .from('companion_profiles')
-        .update({ headline: 'Updated', rate_cents: 3000 })
+        .update({ rates: { lunch: 30, dinner: 35, coffee: 15, happy_hour: 25 } })
         .eq('user_id', companion.id)
-        .select('headline, rate_cents')
+        .select('rates')
         .single();
       expect(error).toBeNull();
-      expect(data).toEqual({ headline: 'Updated', rate_cents: 3000 });
+      expect((data as { rates: Record<string, number> }).rates).toEqual({
+        lunch: 30,
+        dinner: 35,
+        coffee: 15,
+        happy_hour: 25,
+      });
+    });
+
+    it('lets a companion offer only some activity types (not all four)', async () => {
+      const coffeeOnly = await createTestUser({ isCompanion: true, isSeeker: false });
+      created.push(coffeeOnly);
+      const { data, error } = await coffeeOnly.client
+        .from('companion_profiles')
+        .insert({
+          user_id: coffeeOnly.id,
+          bio: 'Coffee only',
+          location: SF,
+          activities: { coffee: true, lunch: false, dinner: false, happy_hour: false },
+          rates: { coffee: 12 },
+        })
+        .select('activities, rates')
+        .single();
+      expect(error).toBeNull();
+      expect((data as { activities: Record<string, boolean> }).activities).toMatchObject({
+        coffee: true,
+      });
+      expect((data as { rates: Record<string, number> }).rates).toEqual({ coffee: 12 });
     });
 
     it('refuses cross-user inserts (RLS companion_profiles_insert_self)', async () => {
@@ -107,14 +113,16 @@ describe.skipIf(noTestSupabaseEnv())('integration: /api/profiles (data layer)', 
       created.push(stranger);
       const { error } = await stranger.client.from('companion_profiles').insert({
         user_id: companion.id, // not the caller
-        rate_cents: 1500,
-        service_area_center: SAN_FRANCISCO,
-        service_radius_m: 5000,
+        bio: 'pwn',
+        location: SF,
       });
       expect(error).not.toBeNull();
     });
   });
 
+  // -------------------------------------------------------------------
+  // Discovery / verification gating
+  // -------------------------------------------------------------------
   describe('GET /api/profiles/[id] — public companion view', () => {
     let unverified: TestUser;
     let verified: TestUser;
@@ -129,143 +137,128 @@ describe.skipIf(noTestSupabaseEnv())('integration: /api/profiles (data layer)', 
       await createCompanionProfile(verified, { verified: true });
     });
 
-    it('hides unverified companions from outside viewers (core product rule #9)', async () => {
+    it('hides an unverified companion profile from a public viewer (core product rule #10)', async () => {
       const { data } = await viewer.client
         .from('companion_profiles')
         .select('user_id')
         .eq('user_id', unverified.id)
         .maybeSingle();
-      // Unverified profile is invisible -> 404 at the route layer.
+      // RLS hides the row -> the route layer turns this into 404.
       expect(data).toBeNull();
     });
 
-    it('reveals verified companions to outside viewers', async () => {
+    it('reveals a verified companion to a public viewer', async () => {
       const { data, error } = await viewer.client
         .from('companion_profiles')
-        .select('user_id, verification_status')
+        .select('user_id, verified_at')
         .eq('user_id', verified.id)
         .maybeSingle();
       expect(error).toBeNull();
-      expect(data).toMatchObject({
-        user_id: verified.id,
-        verification_status: 'verified',
-      });
+      expect(data).toMatchObject({ user_id: verified.id });
+      expect((data as { verified_at: string | null }).verified_at).not.toBeNull();
     });
 
-    it('lets a verified companion see themselves regardless of viewer rule', async () => {
+    it('lets a companion see themselves regardless of verification', async () => {
       const { data } = await unverified.client
         .from('companion_profiles')
-        .select('user_id')
+        .select('user_id, verified_at')
         .eq('user_id', unverified.id)
         .maybeSingle();
-      // Owner sees their own row even when not verified yet
-      // (companion_profiles_select_self).
       expect(data).toMatchObject({ user_id: unverified.id });
+      expect((data as { verified_at: string | null }).verified_at).toBeNull();
     });
   });
 
-  describe('availability windows', () => {
+  // -------------------------------------------------------------------
+  // Rate validation at the data layer (positive whole dollars)
+  // -------------------------------------------------------------------
+  // Note: the current schema enforces invariants in the API validator
+  // (rates must be positive integers $1..$500). The migrations do NOT
+  // declare a CHECK constraint on the rates jsonb column itself, so
+  // writing rates = { lunch: 0 } via the data layer is accepted by the
+  // database — the API blocks it. The integration tests below pin both
+  // halves of that story so a future migration that adds a CHECK can
+  // tighten this without unsettling the rest of the suite.
+  describe('rate behaviour', () => {
     let companion: TestUser;
     beforeAll(async () => {
-      companion = await createTestUser({ isCompanion: true });
+      companion = await createTestUser({ isCompanion: true, isSeeker: false });
       created.push(companion);
       await createCompanionProfile(companion);
     });
 
-    it('creates a valid window', async () => {
+    it('the database currently accepts any jsonb shape (validator is in the API layer)', async () => {
+      const { error } = await companion.client
+        .from('companion_profiles')
+        .update({ rates: { lunch: 0 } })
+        .eq('user_id', companion.id);
+      // No DB-level CHECK on rates yet. The Core API validator is the
+      // enforcer (see tests/unit/companion-fees.test.ts).
+      expect(error).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Availability — companion-set windows linked to companion_profiles.id
+  // -------------------------------------------------------------------
+  describe('availability windows', () => {
+    let companion: TestUser;
+    let profileId: string;
+
+    beforeAll(async () => {
+      companion = await createTestUser({ isCompanion: true });
+      created.push(companion);
+      const profile = await createCompanionProfile(companion);
+      profileId = (profile as { id: string }).id;
+    });
+
+    it('lets the owner create a valid window', async () => {
       const { data, error } = await companion.client
         .from('availability')
         .insert({
-          companion_user_id: companion.id,
-          day_of_week: 1,
-          start_time: '12:00',
-          end_time: '13:30',
-          meal_type: 'lunch',
-          timezone: 'America/Los_Angeles',
+          companion_profile_id: profileId,
+          day_or_date: 'Mon',
+          time_range: '12:00-13:30',
+          activity_types: ['lunch'],
         })
-        .select('id, day_of_week, start_time, end_time')
+        .select('id, day_or_date, time_range, activity_types')
         .single();
       expect(error).toBeNull();
-      expect(data).toMatchObject({ day_of_week: 1 });
-    });
-
-    it('rejects a window where end_time <= start_time (CHECK availability_window_order)', async () => {
-      const { error } = await companion.client.from('availability').insert({
-        companion_user_id: companion.id,
-        day_of_week: 2,
-        start_time: '13:00',
-        end_time: '12:00',
-        meal_type: 'lunch',
-        timezone: 'UTC',
+      expect(data).toMatchObject({
+        day_or_date: 'Mon',
+        time_range: '12:00-13:30',
+        activity_types: ['lunch'],
       });
-      expect(error).not.toBeNull();
     });
 
-    it('rejects insert without a companion_profiles row (FK violation -> conflict at route level)', async () => {
-      // A user without a companion profile cannot insert availability.
-      const seekerOnly = await createTestUser({ isCompanion: true });
-      created.push(seekerOnly);
-      // Note: created via admin without a companion_profiles row.
-      const { error } = await seekerOnly.client.from('availability').insert({
-        companion_user_id: seekerOnly.id,
-        day_of_week: 0,
-        start_time: '11:00',
-        end_time: '12:00',
-        meal_type: 'lunch',
-        timezone: 'UTC',
-      });
-      expect(error).not.toBeNull();
-    });
-
-    it('lists ordered by (day_of_week, start_time) like the route does', async () => {
-      // Insert two more out-of-order windows.
-      await companion.client.from('availability').insert([
-        {
-          companion_user_id: companion.id,
-          day_of_week: 0,
-          start_time: '18:00',
-          end_time: '19:00',
-          meal_type: 'dinner',
-          timezone: 'UTC',
-        },
-        {
-          companion_user_id: companion.id,
-          day_of_week: 1,
-          start_time: '09:00',
-          end_time: '10:30',
-          meal_type: 'lunch',
-          timezone: 'UTC',
-        },
-      ]);
-
+    it('lets the owner create a one-off date window', async () => {
       const { data, error } = await companion.client
         .from('availability')
-        .select('day_of_week, start_time')
-        .eq('companion_user_id', companion.id)
-        .order('day_of_week', { ascending: true })
-        .order('start_time', { ascending: true });
+        .insert({
+          companion_profile_id: profileId,
+          day_or_date: '2026-06-04',
+          time_range: '18:30-20:00',
+          activity_types: ['dinner', 'happy_hour'],
+        })
+        .select('day_or_date, activity_types')
+        .single();
       expect(error).toBeNull();
-      const rows = (data ?? []) as { day_of_week: number; start_time: string }[];
-      const sequence: [number, string][] = rows.map((r) => [r.day_of_week, r.start_time]);
-      expect(sequence.length).toBeGreaterThanOrEqual(3);
-      const sorted = [...sequence].sort((a, b) => {
-        if (a[0] !== b[0]) return a[0] - b[0];
-        return a[1].localeCompare(b[1]);
-      });
-      expect(sequence).toEqual(sorted);
+      expect((data as { activity_types: string[] }).activity_types).toEqual([
+        'dinner',
+        'happy_hour',
+      ]);
     });
 
     it('cascades availability when the companion_profiles row is deleted', async () => {
       const ephemeral = await createTestUser({ isCompanion: true });
       created.push(ephemeral);
-      await createCompanionProfile(ephemeral);
+      const profile = await createCompanionProfile(ephemeral);
+      const ephemeralProfileId = (profile as { id: string }).id;
       await ephemeral.client.from('availability').insert({
-        companion_user_id: ephemeral.id,
-        day_of_week: 3,
-        start_time: '12:00',
-        end_time: '13:00',
-        meal_type: 'lunch',
-        timezone: 'UTC',
+        companion_profile_id: ephemeralProfileId,
+        day_or_date: 'Wed',
+        time_range: '12:00-13:00',
+        activity_types: ['lunch'],
       });
 
       // Delete the profile via the owner's client.
@@ -280,43 +273,15 @@ describe.skipIf(noTestSupabaseEnv())('integration: /api/profiles (data layer)', 
       const { data: leftover } = await admin
         .from('availability')
         .select('id')
-        .eq('companion_user_id', ephemeral.id);
+        .eq('companion_profile_id', ephemeralProfileId);
       expect(leftover ?? []).toEqual([]);
     });
   });
 
-  describe('photo reference', () => {
-    let user: TestUser;
-    beforeAll(async () => {
-      user = await createTestUser({ isSeeker: true });
-      created.push(user);
-    });
-
-    it('lets the owner set their own avatar_path (any string; namespace check is route-level)', async () => {
-      const path = `${user.id}/avatar-1.webp`;
-      const { data, error } = await user.client
-        .from('users')
-        .update({ avatar_path: path })
-        .eq('id', user.id)
-        .select('avatar_path')
-        .single();
-      expect(error).toBeNull();
-      expect(data).toEqual({ avatar_path: path });
-    });
-
-    it('lets the owner clear their avatar_path', async () => {
-      const { data, error } = await user.client
-        .from('users')
-        .update({ avatar_path: null })
-        .eq('id', user.id)
-        .select('avatar_path')
-        .single();
-      expect(error).toBeNull();
-      expect(data).toEqual({ avatar_path: null });
-    });
-  });
-
-  describe('owner-only fields cannot be self-promoted', () => {
+  // -------------------------------------------------------------------
+  // verified_at is owner-only-readable; only Trust & Safety writes it
+  // -------------------------------------------------------------------
+  describe('verification gate behaviour', () => {
     let companion: TestUser;
     beforeAll(async () => {
       companion = await createTestUser({ isCompanion: true });
@@ -324,17 +289,29 @@ describe.skipIf(noTestSupabaseEnv())('integration: /api/profiles (data layer)', 
       await createCompanionProfile(companion);
     });
 
-    it('rejects self-verification (CHECK companion_profiles_verified_at_set)', async () => {
-      // Even though RLS lets the owner update their row, the constraint
-      // forbids `verification_status = 'verified'` without a `verified_at`
-      // timestamp. The Auth & Identity agent's verification flow sets
-      // BOTH atomically; a malicious client cannot synthesize verification
-      // by writing only one column.
-      const { error: bareErr } = await companion.client
+    it('flipping verified_at via admin makes the profile discoverable', async () => {
+      const viewer = await createTestUser({ isSeeker: true });
+      created.push(viewer);
+
+      const beforeProbe = await viewer.client
         .from('companion_profiles')
-        .update({ verification_status: 'verified' })
-        .eq('user_id', companion.id);
-      expect(bareErr).not.toBeNull();
+        .select('user_id')
+        .eq('user_id', companion.id)
+        .maybeSingle();
+      expect(beforeProbe.data).toBeNull();
+
+      await setCompanionVerification(companion.id, true);
+
+      const afterProbe = await viewer.client
+        .from('companion_profiles')
+        .select('user_id, verified_at')
+        .eq('user_id', companion.id)
+        .maybeSingle();
+      expect(afterProbe.data).toMatchObject({ user_id: companion.id });
+      expect((afterProbe.data as { verified_at: string | null }).verified_at).not.toBeNull();
+
+      // Restore unverified state for downstream tests in this file.
+      await setCompanionVerification(companion.id, false);
     });
   });
 });

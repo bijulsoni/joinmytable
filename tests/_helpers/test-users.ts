@@ -1,5 +1,7 @@
 // Test-user lifecycle helpers.
 //
+// Owner: QA & Testing agent.
+//
 // Every integration / RLS suite mints its own users via the service-role
 // admin client (so we never need to confirm an email by hand) and tears
 // them down in afterAll. The Auth & Identity agent's sign-up flow
@@ -9,21 +11,32 @@
 // Every test user gets a unique email so concurrent suites don't
 // collide. Cleanup deletes the auth.users row; the public.users row
 // cascades via the foreign key (see migration 20260515000200_users.sql).
+//
+// Schema reference (phase 1 v2 — CLAUDE.md "Database schema"):
+//   public.users:              id, email, name, is_seeker, is_companion,
+//                              verification_status
+//   public.companion_profiles: id, user_id, bio, service_area, location,
+//                              activities (jsonb), rates (jsonb),
+//                              photo_urls (text[]), verified_at
+//   public.availability:       id, companion_profile_id, day_or_date,
+//                              time_range, activity_types (text[])
 
-import { adminClient, asUserClient, anonClient, type AnyClient } from './supabase-clients';
+import type { ActivityType } from '@/lib/types';
 import { readTestSupabaseEnv } from './env';
+import { adminClient, anonClient, asUserClient, type AnyClient } from './supabase-clients';
 
 export interface TestUserOptions {
   isSeeker?: boolean;
   isCompanion?: boolean;
-  acceptedGuidelines?: boolean;
-  displayName?: string;
+  /** Display name written to public.users.name. */
+  name?: string;
 }
 
 export interface TestUser {
   id: string;
   email: string;
   password: string;
+  name: string;
   accessToken: string;
   /** Authenticated PostgREST client carrying the user's JWT. */
   client: AnyClient;
@@ -50,7 +63,7 @@ export async function createTestUser(opts: TestUserOptions = {}): Promise<TestUs
   const admin = ADMIN();
   const email = uniqueEmail();
   const password = `Pw-${Math.random().toString(36).slice(2)}-${Date.now()}`;
-  const displayName = opts.displayName ?? `Test User ${userCounter}`;
+  const name = opts.name ?? `Test User ${userCounter}`;
 
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
@@ -64,18 +77,16 @@ export async function createTestUser(opts: TestUserOptions = {}): Promise<TestUs
 
   const isSeeker = opts.isSeeker ?? true;
   const isCompanion = opts.isCompanion ?? false;
-  const guidelinesAt = opts.acceptedGuidelines === false ? null : new Date().toISOString();
 
-  // Insert mirror row via admin so RLS doesn't fight us during fixture
+  // Insert mirror row via admin so RLS does not fight us during fixture
   // setup; the production sign-up path uses the same admin client.
   const { error: mirrorErr } = await admin.from('users').upsert(
     {
       id: userId,
       email,
-      display_name: displayName,
+      name,
       is_seeker: isSeeker,
       is_companion: isCompanion,
-      guidelines_accepted_at: guidelinesAt,
     },
     { onConflict: 'id' },
   );
@@ -84,8 +95,8 @@ export async function createTestUser(opts: TestUserOptions = {}): Promise<TestUs
     throw new Error(`Could not create users mirror row: ${mirrorErr.message}`);
   }
 
-  // Sign in to get an access token. We use the anon client so we go
-  // through the standard password grant flow — no admin shortcuts.
+  // Sign in via the password grant flow — no admin shortcuts — so the
+  // resulting access token is exactly what the app would receive.
   const session = anonClient();
   const { data: signIn, error: signInErr } = await session.auth.signInWithPassword({
     email,
@@ -100,6 +111,7 @@ export async function createTestUser(opts: TestUserOptions = {}): Promise<TestUs
     id: userId,
     email,
     password,
+    name,
     accessToken: signIn.session.access_token,
     client: asUserClient(signIn.session.access_token),
   };
@@ -112,9 +124,7 @@ export async function createTestUser(opts: TestUserOptions = {}): Promise<TestUs
 export async function deleteTestUsers(users: TestUser[]): Promise<void> {
   if (users.length === 0) return;
   const admin = ADMIN();
-  await Promise.all(
-    users.map((u) => admin.auth.admin.deleteUser(u.id).catch(() => undefined)),
-  );
+  await Promise.all(users.map((u) => admin.auth.admin.deleteUser(u.id).catch(() => undefined)));
 }
 
 // ---------------------------------------------------------------------------
@@ -122,13 +132,26 @@ export async function deleteTestUsers(users: TestUser[]): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export interface CompanionProfileFixtureOptions {
-  rateCents?: number;
-  serviceRadiusM?: number;
-  centerLng?: number;
-  centerLat?: number;
+  bio?: string | null;
+  service_area?: string | null;
+  /** WGS-84 longitude. Default: San Francisco. */
+  lng?: number;
+  /** WGS-84 latitude. Default: San Francisco. */
+  lat?: number;
   /**
-   * If true, force verification_status to 'verified' via the admin
-   * client. Use sparingly — default is unverified, matching real life.
+   * Activity-keyed booleans. Defaults to lunch+dinner on, the other two
+   * off — enough to exercise the per-activity discovery filters.
+   */
+  activities?: Partial<Record<ActivityType, boolean>>;
+  /**
+   * Activity-keyed whole-dollar rates. Defaults to typical CLAUDE.md
+   * suggested-fee values (lunch 22, dinner 25, coffee 12, happy_hour 20).
+   */
+  rates?: Partial<Record<ActivityType, number>>;
+  photo_urls?: string[];
+  /**
+   * If true, set verified_at via the admin client. Use sparingly — the
+   * default is unverified, matching the real signup -> review flow.
    */
   verified?: boolean;
 }
@@ -144,19 +167,28 @@ export async function createCompanionProfile(
   const admin = ADMIN();
   const payload: Record<string, unknown> = {
     user_id: user.id,
-    headline: 'QA fixture profile',
-    bio_long: null,
-    rate_cents: opts.rateCents ?? 2500,
-    rate_currency: 'USD',
-    meal_types: ['lunch', 'dinner'],
-    service_area_center: {
+    bio: opts.bio ?? 'QA fixture profile',
+    service_area: opts.service_area ?? null,
+    // PostGIS geography(Point, 4326) round-trips as GeoJSON.
+    location: {
       type: 'Point',
-      coordinates: [opts.centerLng ?? -122.4194, opts.centerLat ?? 37.7749],
+      coordinates: [opts.lng ?? -122.4194, opts.lat ?? 37.7749],
     },
-    service_radius_m: opts.serviceRadiusM ?? 5000,
+    activities: opts.activities ?? {
+      lunch: true,
+      dinner: true,
+      coffee: false,
+      happy_hour: false,
+    },
+    rates: opts.rates ?? {
+      lunch: 22,
+      dinner: 25,
+      coffee: 12,
+      happy_hour: 20,
+    },
+    photo_urls: opts.photo_urls ?? [],
   };
   if (opts.verified) {
-    payload.verification_status = 'verified';
     payload.verified_at = new Date().toISOString();
   }
   const { data, error } = await admin
@@ -168,4 +200,18 @@ export async function createCompanionProfile(
     throw new Error(`Could not create companion_profiles fixture: ${error?.message}`);
   }
   return data as Record<string, unknown>;
+}
+
+/**
+ * Promote (or demote) an existing companion profile to verified. Used by
+ * tests that need to flip visibility mid-run.
+ */
+export async function setCompanionVerification(userId: string, verified: boolean): Promise<void> {
+  const { error } = await ADMIN()
+    .from('companion_profiles')
+    .update({ verified_at: verified ? new Date().toISOString() : null })
+    .eq('user_id', userId);
+  if (error) {
+    throw new Error(`Could not set verification for ${userId}: ${error.message}`);
+  }
 }

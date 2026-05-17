@@ -1,162 +1,152 @@
 // Zod validators for the profiles API.
 //
-// Every route handler validates its input with one of these schemas
-// before touching the database. The bounds mirror the CHECK constraints
-// declared in `supabase/migrations/20260515000200_users.sql` so the
-// caller gets a clean 400 instead of a leaked Postgres error.
+// Every profile route handler validates its input with one of these
+// schemas before touching the database. Bounds reflect the CLAUDE.md
+// "Activity types" suggested-fee ranges (loose validation here; the
+// companion can set any positive whole-dollar rate).
 
 import { z } from 'zod';
-import { MEAL_TYPES, type MealType } from '@/lib/types';
+import {
+  ACTIVITY_TYPES,
+  type ActivityType,
+  type CompanionActivitiesMap,
+  type CompanionRatesMap,
+} from '@/lib/types';
+import { activityTypesArraySchema, geoJSONPointSchema } from '@/app/api/_lib/validators';
 
 // ---------------------------------------------------------------------------
 // Shared fragments
 // ---------------------------------------------------------------------------
 
-const mealTypeSchema = z.enum(MEAL_TYPES as readonly [MealType, ...MealType[]]);
+const bioSchema = z.string().max(4000, 'Bio must be 4000 characters or fewer.').trim().nullable();
 
-const mealTypesArraySchema = z
-  .array(mealTypeSchema)
-  .min(1, 'Pick at least one meal type.')
-  .max(MEAL_TYPES.length)
-  .transform((arr) => Array.from(new Set(arr)));
-
-const headlineSchema = z
+const serviceAreaSchema = z
   .string()
-  .max(120, 'Headline must be 120 characters or fewer.')
+  .max(200, 'Service area must be 200 characters or fewer.')
   .trim()
   .nullable();
 
-const bioLongSchema = z
-  .string()
-  .max(4000, 'Long bio must be 4000 characters or fewer.')
-  .trim()
-  .nullable();
+// activities is a jsonb map of ActivityType -> boolean. We accept any
+// subset of the four allowed keys; unrecognised keys are stripped.
+const activitiesMapSchema = z
+  .record(z.string(), z.boolean())
+  .transform((raw): CompanionActivitiesMap => {
+    const out: CompanionActivitiesMap = {};
+    for (const key of ACTIVITY_TYPES) {
+      const v = raw[key];
+      if (typeof v === 'boolean') out[key] = v;
+    }
+    return out;
+  });
 
-// rate_cents: CHECK (rate_cents between 500 and 20000). Locked by the
-// database; the API rejects out-of-band values up front.
-const rateCentsSchema = z
+// rates is a jsonb map of ActivityType -> whole-dollar number. Bounds
+// are loose (the suggested ranges in CLAUDE.md are advisory, not
+// enforced); we just clamp to "positive integer, reasonable cap".
+const rateValueSchema = z
   .number()
-  .int('Rate must be a whole number of cents.')
-  .min(500, 'Rate must be at least $5.00.')
-  .max(20000, 'Rate must be no more than $200.00.');
+  .int('Rate must be a whole number of dollars.')
+  .min(1, 'Rate must be at least $1.')
+  .max(500, 'Rate must be no more than $500.');
 
-// ISO 4217 currency code; column type is char(3). We only accept the
-// uppercase form so the database stores a consistent shape.
-const currencySchema = z
-  .string()
-  .regex(/^[A-Z]{3}$/, 'Currency must be a 3-letter ISO code (e.g. USD).');
-
-// PostGIS geography(Point, 4326) is serialized as a GeoJSON Point by
-// PostgREST. Validate the GeoJSON envelope and the WGS-84 ranges.
-const geoJSONPointSchema = z.object({
-  type: z.literal('Point'),
-  coordinates: z.tuple([
-    z.number().gte(-180).lte(180), // longitude
-    z.number().gte(-90).lte(90), // latitude
-  ]),
+const ratesMapSchema = z.record(z.string(), rateValueSchema).transform((raw): CompanionRatesMap => {
+  const out: CompanionRatesMap = {};
+  for (const key of ACTIVITY_TYPES) {
+    const v = raw[key];
+    if (typeof v === 'number') out[key] = v;
+  }
+  return out;
 });
 
-// service_radius_m: CHECK between 500 and 100000.
-const serviceRadiusSchema = z
-  .number()
-  .int('Radius must be a whole number of meters.')
-  .min(500, 'Service radius must be at least 500 meters.')
-  .max(100_000, 'Service radius must be at most 100 km.');
-
-// HH:MM or HH:MM:SS. Postgres `time` accepts seconds so we keep them
-// optional. Rejecting at the API removes ambiguity for the Frontend.
-const timeOfDaySchema = z
+// Single photo URL.  Companion uploads pass through Supabase Storage /
+// Auth uploader; this endpoint stores the resolved URL.
+const photoUrlSchema = z
   .string()
-  .regex(/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/, 'Time must be in HH:MM or HH:MM:SS format.');
-
-// IANA timezone string. We do a structural check; the database will
-// reject anything Postgres cannot parse.
-const timezoneSchema = z
-  .string()
-  .min(1, 'Timezone is required.')
-  .max(64)
-  .regex(
-    /^[A-Za-z][A-Za-z0-9_+\-/]*$/,
-    'Timezone must be an IANA identifier (e.g. America/Los_Angeles).',
-  );
+  .url('Photo must be a valid URL.')
+  .max(2048, 'Photo URL is too long.');
 
 // ---------------------------------------------------------------------------
 // Companion profile upsert
 // ---------------------------------------------------------------------------
-// PUT /api/profiles/me payload. All fields required (this is the
-// representation of the resource, not a partial patch). The route
-// handler upserts on (user_id).
+// PUT /api/profiles/me payload. Whole-resource write per the contract,
+// but every column is optional on the wire so the Frontend can drip-fill
+// during onboarding without losing existing values.
 
-export const companionProfileUpsertSchema = z.object({
-  headline: headlineSchema.optional().default(null),
-  bio_long: bioLongSchema.optional().default(null),
-  rate_cents: rateCentsSchema,
-  rate_currency: currencySchema.optional().default('USD'),
-  meal_types: mealTypesArraySchema.optional().default(['lunch', 'dinner']),
-  service_area_center: geoJSONPointSchema,
-  service_radius_m: serviceRadiusSchema,
-});
+export const companionProfileUpsertSchema = z
+  .object({
+    bio: bioSchema.optional(),
+    service_area: serviceAreaSchema.optional(),
+    location: geoJSONPointSchema.nullable().optional(),
+    activities: activitiesMapSchema.optional(),
+    rates: ratesMapSchema.optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, {
+    message: 'Provide at least one field.',
+  });
 
 export type CompanionProfileUpsertInput = z.infer<typeof companionProfileUpsertSchema>;
 
 // ---------------------------------------------------------------------------
 // Availability
 // ---------------------------------------------------------------------------
+// day_or_date and time_range are free-form text per CLAUDE.md; the API
+// validates non-empty trimmed strings and an `activity_types` array
+// drawn from the four allowed values.
 
-export const availabilityCreateSchema = z
-  .object({
-    day_of_week: z.number().int().min(0).max(6, 'Day of week must be 0 (Sun) - 6 (Sat).'),
-    start_time: timeOfDaySchema,
-    end_time: timeOfDaySchema,
-    meal_type: mealTypeSchema,
-    timezone: timezoneSchema,
-  })
-  .refine((v) => v.end_time > v.start_time, {
-    message: 'end_time must be after start_time.',
-    path: ['end_time'],
-  });
+const dayOrDateSchema = z
+  .string()
+  .trim()
+  .min(1, 'day_or_date is required.')
+  .max(40, 'day_or_date must be 40 characters or fewer.');
+
+const timeRangeSchema = z
+  .string()
+  .trim()
+  .min(1, 'time_range is required.')
+  .max(40, 'time_range must be 40 characters or fewer.');
+
+export const availabilityCreateSchema = z.object({
+  day_or_date: dayOrDateSchema,
+  time_range: timeRangeSchema,
+  activity_types: activityTypesArraySchema,
+});
 
 export type AvailabilityCreateInput = z.infer<typeof availabilityCreateSchema>;
 
-// Updates are partial; we re-validate the start/end ordering when both
-// are present so a partial patch cannot land an invalid window.
 export const availabilityUpdateSchema = z
   .object({
-    day_of_week: z.number().int().min(0).max(6).optional(),
-    start_time: timeOfDaySchema.optional(),
-    end_time: timeOfDaySchema.optional(),
-    meal_type: mealTypeSchema.optional(),
-    timezone: timezoneSchema.optional(),
+    day_or_date: dayOrDateSchema.optional(),
+    time_range: timeRangeSchema.optional(),
+    activity_types: activityTypesArraySchema.optional(),
   })
-  .refine(
-    (v) => v.start_time === undefined || v.end_time === undefined || v.end_time > v.start_time,
-    { message: 'end_time must be after start_time.', path: ['end_time'] },
-  )
-  .refine((v) => Object.values(v).some((x) => x !== undefined), {
+  .refine((v) => Object.keys(v).length > 0, {
     message: 'Provide at least one field to update.',
   });
 
 export type AvailabilityUpdateInput = z.infer<typeof availabilityUpdateSchema>;
 
 // ---------------------------------------------------------------------------
-// Photo reference
+// Photo endpoints
 // ---------------------------------------------------------------------------
-// The Auth & Identity agent owns avatar uploads (see lib/auth/storage.ts):
-// `uploadAvatar` writes a `<userId>/avatar-<ts>.<ext>` object into the
-// `avatars` bucket AND sets users.avatar_path to that key. This endpoint
-// exists for the lower-traffic case of re-pointing avatar_path at an
-// already-uploaded object (or clearing it) without re-uploading.
+// New schema stores `photo_urls text[]` on companion_profiles. POST
+// appends a URL, DELETE removes one by exact match.
 
-export const photoSetSchema = z.object({
-  avatar_path: z.string().min(1, 'avatar_path is required.').max(512, 'avatar_path is too long.'),
+export const photoAddSchema = z.object({
+  url: photoUrlSchema,
 });
 
-export type PhotoSetInput = z.infer<typeof photoSetSchema>;
+export type PhotoAddInput = z.infer<typeof photoAddSchema>;
+
+export const photoRemoveSchema = z.object({
+  url: photoUrlSchema,
+});
+
+export type PhotoRemoveInput = z.infer<typeof photoRemoveSchema>;
 
 // ---------------------------------------------------------------------------
-// UUID path params
+// Re-exports for convenience
 // ---------------------------------------------------------------------------
 
-export const uuidSchema = z
-  .string()
-  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Expected a UUID.');
+export { uuidSchema } from '@/app/api/_lib/validators';
+
+/** Subset of ACTIVITY_TYPES re-exported so consumers can build pickers. */
+export const SUPPORTED_ACTIVITY_TYPES: readonly ActivityType[] = ACTIVITY_TYPES;

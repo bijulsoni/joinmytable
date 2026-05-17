@@ -1,70 +1,120 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Button } from '@/components/ui';
+import { ActivityIcon } from '@/components/activity';
 import { getSessionUser } from '@/lib/auth/session';
+import { ACTIVITY_TYPE_META, type ActivityType } from '@/lib/types';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
-  title: 'JoinMyTable — Share a meal',
+  title: 'JoinMyTable — Never lunch alone again',
   description:
-    'JoinMyTable is a marketplace for lunch and dinner companionship. Sign up as a seeker, a companion, or both.',
+    'A two-sided marketplace for shared-activity companionship. Find a companion for coffee, lunch, happy hour, or dinner.',
 };
 
-// Public landing. Signed-in visitors are routed straight to /verify
-// (the post-auth hub Auth & Identity exposes). Signed-out visitors get
-// the marketing entry with prominent sign-up + login affordances.
+// Public landing page. Signed-in visitors are routed straight to the
+// post-auth hub. Signed-out visitors get a warm, mobile-first marketing
+// surface with two paths in: become a seeker or a companion.
+//
+// The hero rotates through the four activities by leaning on the
+// `--activity` custom property so the headline accent stays color-aware
+// without us hard-coding a token.
+
+const ACTIVITY_COPY: Record<ActivityType, string> = {
+  coffee: 'A warm cup, a real conversation.',
+  lunch: 'Midday break, better with company.',
+  happy_hour: 'End the day over a drink.',
+  dinner: 'A table set for two.',
+};
+
+const HERO_ACTIVITY: ActivityType = 'lunch';
+
 export default async function HomePage() {
   const user = await getSessionUser();
   if (user) {
-    redirect('/verify');
+    redirect('/discover');
   }
 
   return (
     <main className={styles.shell}>
-      <section className={styles.hero}>
-        <h1 className={styles.headline}>Never eat alone.</h1>
+      <header className={styles.topbar}>
+        <Link href="/" className={styles.wordmark}>
+          JoinMyTable
+        </Link>
+        <Link href="/login" className={styles.topbarLogin}>
+          Sign in
+        </Link>
+      </header>
+
+      <section className={styles.hero} data-activity={HERO_ACTIVITY}>
+        <p className={styles.eyebrow}>Coffee · Lunch · Happy hour · Dinner</p>
+        <h1 className={styles.headline}>
+          Never <span className={styles.headlineSpan}>lunch</span> alone again.
+        </h1>
         <p className={styles.lede}>
-          JoinMyTable matches you with a companion for lunch or dinner. Seekers cover the meal and a
-          flat companionship fee. Companions get paid and eat free.
+          JoinMyTable matches you with a friendly, verified companion for a meal, a drink, or a
+          coffee. You cover the activity and a flat fee. They show up and make it better.
         </p>
 
         <div className={styles.ctaRow}>
-          <Link href="/sign-up" className={styles.primary}>
-            Create an account
-          </Link>
-          <Link href="/login" className={styles.secondary}>
-            I already have an account
-          </Link>
+          <Button as="a" href="/sign-up?mode=seeker">
+            Find a companion
+          </Button>
+          <Button as="a" href="/sign-up?mode=companion" variant="secondary">
+            Become a companion
+          </Button>
         </div>
-
-        <p className={styles.fineprint}>
-          One account, two modes. Be a seeker, a companion, or both.
-        </p>
       </section>
 
-      <section className={styles.howItWorks} aria-labelledby="how-it-works">
-        <h2 id="how-it-works" className={styles.sectionHeading}>
-          How it works
+      <section className={styles.activities} aria-labelledby="activities-heading">
+        <h2 id="activities-heading" className={styles.activitiesHeading}>
+          Four ways to share a table
         </h2>
-        <ol className={styles.steps}>
-          <li>
-            <strong>Sign up.</strong> Pick seeker, companion, or both. Accept the community
-            guidelines.
-          </li>
-          <li>
-            <strong>Find a companion.</strong> Browse verified companions near you, filter by meal
-            type and price.
-          </li>
-          <li>
-            <strong>Request a meal.</strong> Pick a lunch or dinner. Chat opens once your companion
-            accepts.
-          </li>
-          <li>
-            <strong>Share the table.</strong> Pay the companionship fee up front — we hold it until
-            the meal is done.
-          </li>
-        </ol>
+        <ul className={styles.activityList}>
+          {(['coffee', 'lunch', 'happy_hour', 'dinner'] as const).map((activity) => {
+            const meta = ACTIVITY_TYPE_META[activity];
+            return (
+              <li key={activity} className={styles.activityCard} data-activity={activity}>
+                <span className={styles.activityIcon}>
+                  <ActivityIcon activity={activity} width={20} height={20} />
+                </span>
+                <span className={styles.activityName}>{meta.label}</span>
+                <p className={styles.activityCopy}>{ACTIVITY_COPY[activity]}</p>
+              </li>
+            );
+          })}
+        </ul>
       </section>
+
+      <section className={styles.howSection} aria-labelledby="how-it-works">
+        <div className={styles.howCard}>
+          <h2 id="how-it-works" className={styles.sectionHeading}>
+            How it works
+          </h2>
+          <ol className={styles.steps}>
+            <li>
+              <strong>Sign up.</strong> Be a seeker, a companion, or both — one account, two modes.
+            </li>
+            <li>
+              <strong>Find a companion.</strong> Filter by activity, time, and price tier near you.
+            </li>
+            <li>
+              <strong>Request a meet.</strong> Chat opens the moment your companion accepts.
+            </li>
+            <li>
+              <strong>Meet up.</strong> Your fee is held safely until after the activity wraps.
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <footer className={styles.footer}>
+        <p>
+          Public venues only. Verified companions only.{' '}
+          <Link href="/safety">Safety &amp; community</Link>.
+        </p>
+      </footer>
     </main>
   );
 }

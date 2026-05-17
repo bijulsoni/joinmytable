@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   verify:
-    name: lint · type-check · test
+    name: lint · type-check · unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -35,5 +35,53 @@ jobs:
       - name: Type check
         run: npm run type-check
 
-      - name: Test
-        run: npm run test
+      - name: Unit tests
+        run: npm run test:unit
+
+  # Integration + RLS suites need a disposable Supabase test project.
+  # They self-skip if TEST_SUPABASE_* env vars are missing, so this job
+  # is safe to run unconditionally — it becomes a no-op on forks /
+  # branches without secrets. We gate the *job itself* on the presence
+  # of TEST_SUPABASE_URL so the green check stays meaningful (no false
+  # "0 passed" pass) and so we don't waste minutes spinning up Node.
+  integration:
+    name: integration + RLS (gated on secrets)
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 20
+    # `${{ secrets.X }}` cannot be referenced inside `if:` directly, so
+    # we expose it through `env` first and then read `env.X`.
+    env:
+      TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - name: Skip if no TEST_SUPABASE_URL is configured
+        if: env.TEST_SUPABASE_URL == ''
+        run: |
+          echo "TEST_SUPABASE_URL is not set; skipping integration + RLS suites."
+          echo "Configure the TEST_SUPABASE_* repository secrets to enable this job."
+
+      - name: Checkout
+        if: env.TEST_SUPABASE_URL != ''
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: env.TEST_SUPABASE_URL != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        if: env.TEST_SUPABASE_URL != ''
+        run: npm ci
+
+      - name: Integration tests
+        if: env.TEST_SUPABASE_URL != ''
+        run: npm run test:integration
+
+      - name: RLS tests
+        if: env.TEST_SUPABASE_URL != ''
+        run: npm run test:rls

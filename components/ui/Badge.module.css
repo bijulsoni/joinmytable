@@ -1,0 +1,35 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.solid {
+  background: var(--activity, var(--color-text-primary));
+  color: var(--color-text-inverse);
+}
+
+.soft {
+  background: var(--activity-soft, var(--color-surface-muted));
+  color: var(--activity, var(--color-text-primary));
+}
+
+.outline {
+  background: transparent;
+  color: var(--activity, var(--color-text-primary));
+  box-shadow: inset 0 0 0 1px var(--activity, var(--color-border-strong));
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}

@@ -11,7 +11,6 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { reconcileSeekerVerification } from '@/lib/auth/verification';
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -44,14 +43,10 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error || !data.session) {
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
     return NextResponse.redirect(new URL('/login?callback=invalid', request.url));
   }
-
-  // The confirmation flow may have just verified the email - recompute
-  // the seeker verification gate.
-  await reconcileSeekerVerification(data.session.user.id);
 
   return response;
 }
