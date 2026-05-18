@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Avatar, Badge, Button, Card, EmptyState, LoadingBlock } from '@/components/ui';
 import { ACTIVITY_TYPE_META, type ActivityType, type RequestStatus } from '@/lib/types';
 import styles from './styles.module.css';
@@ -59,6 +59,8 @@ function statusToneClass(status: RequestStatus): string {
 
 export function RequestsHub() {
   const router = useRouter();
+  const search = useSearchParams();
+  const justSent = search.get('sent') === '1';
   const [data, setData] = useState<RequestsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -117,6 +119,13 @@ export function RequestsHub() {
           Inbound requests need your reply. Outbound requests show the status from your companion.
         </p>
       </header>
+
+      {justSent ? (
+        <div className={styles.successBanner}>
+          ✓ Your request is on its way. You&apos;ll see it below; the companion will accept or
+          decline.
+        </div>
+      ) : null}
 
       {error ? <div className={styles.errorBanner}>{error}</div> : null}
 

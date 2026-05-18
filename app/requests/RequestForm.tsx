@@ -31,7 +31,40 @@ import type { PublicCompanionProfileDTO } from '@/app/api/profiles/_lib/types';
 import styles from './styles.module.css';
 
 interface ApiErrorBody {
-  error?: { code?: string; message?: string };
+  error?: {
+    code?: string;
+    message?: string;
+    details?: {
+      fieldErrors?: Record<string, string[]>;
+      formErrors?: string[];
+    };
+  };
+}
+
+// Friendly field labels for error surfacing.
+const FIELD_LABELS: Record<string, string> = {
+  companion_id: 'Companion',
+  activity_type: 'Activity',
+  proposed_time: 'Date & time',
+  venue_name: 'Venue name',
+  venue_location: 'Neighborhood or address',
+  budget_tier: 'Budget tier',
+  message: 'Message',
+};
+
+type Details = NonNullable<NonNullable<ApiErrorBody['error']>['details']>;
+
+function formatFieldErrors(details: Details | undefined): string | null {
+  if (!details) return null;
+  const parts: string[] = [];
+  const fields = details.fieldErrors ?? {};
+  for (const [field, errs] of Object.entries(fields)) {
+    if (!Array.isArray(errs) || errs.length === 0) continue;
+    const label = FIELD_LABELS[field] ?? field;
+    parts.push(`${label}: ${errs[0]}`);
+  }
+  for (const err of details.formErrors ?? []) parts.push(err);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 function todayLocal(): string {
@@ -146,6 +179,10 @@ export function RequestForm() {
         setSubmitError('Pick a valid date and time.');
         return;
       }
+      if (!venueName.trim()) {
+        setSubmitError('Venue name is required.');
+        return;
+      }
 
       setSubmitting(true);
       try {
@@ -159,10 +196,10 @@ export function RequestForm() {
             companion_id: companionId,
             activity_type: activity,
             proposed_time: proposedTime,
-            venue_name: venueName || null,
-            venue_location: venueLocation || null,
+            venue_name: venueName.trim(),
+            venue_location: venueLocation.trim() || undefined,
             budget_tier: budget,
-            message: message || null,
+            message: message.trim() || undefined,
           }),
         });
         if (res.status === 404) {
@@ -171,10 +208,12 @@ export function RequestForm() {
         }
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as ApiErrorBody;
-          throw new Error(body.error?.message ?? `Request failed (${res.status}).`);
+          const fieldDetail = formatFieldErrors(body.error?.details);
+          throw new Error(fieldDetail ?? body.error?.message ?? `Request failed (${res.status}).`);
         }
-        const body = (await res.json()) as { request: { id: string } };
-        router.push(`/requests/${body.request.id}`);
+        // Request created successfully. Take the seeker to their hub so
+        // they can see their new outbound request alongside any others.
+        router.push('/requests?sent=1');
       } catch (err) {
         setSubmitError(err instanceof Error ? err.message : 'Could not send your request.');
       } finally {
@@ -292,9 +331,10 @@ export function RequestForm() {
 
         <Input
           label="Venue name"
-          help="Public venue only - café, restaurant, or bar."
+          help="Public venue only — café, restaurant, or bar."
           value={venueName}
           onChange={(e) => setVenueName(e.target.value)}
+          required
           placeholder={
             activity
               ? `e.g. ${

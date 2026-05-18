@@ -438,3 +438,71 @@
   cursor: pointer;
   font-family: inherit;
 }
+
+/* -------- Inline area search ----------------------------------- */
+
+.areaSearch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  margin: 0 0 0.875rem 0;
+  box-shadow: var(--shadow-xs);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.areaSearch:focus-within {
+  border-color: var(--color-ink);
+  box-shadow: var(--shadow-focus);
+}
+
+.areaSearchIcon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-text-secondary);
+}
+
+.areaSearchInput {
+  flex: 1;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+  outline: none;
+  padding: 0.125rem 0;
+  min-width: 0;
+}
+
+.areaSearchInput::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.areaSearchClear {
+  appearance: none;
+  border: 0;
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.areaSearchClear:hover {
+  background: var(--color-border-strong);
+  color: var(--color-text-primary);
+}

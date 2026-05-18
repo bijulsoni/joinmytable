@@ -189,3 +189,121 @@
 .errorBox {
   padding: 2rem 1.25rem;
 }
+
+/* -------- Activity picker tiles (selectable) --------------------- */
+
+.activityTiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+@media (min-width: 600px) {
+  .activityTiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 720px) {
+  .activityTiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.activityTile {
+  appearance: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem 1rem;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--color-text-primary);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.activityTile:hover {
+  border-color: var(--color-border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.activityTile:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.activityTileSelected {
+  background: var(--activity-tint);
+  border-color: var(--activity);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--activity) 18%, transparent);
+}
+
+.activityTileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--activity-soft);
+  color: var(--activity);
+}
+
+.activityTileSelected .activityTileIcon {
+  background: var(--activity);
+  color: var(--color-text-inverse);
+}
+
+.activityTileLabel {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  font-variation-settings:
+    'opsz' 24,
+    'SOFT' 50;
+}
+
+.activityTilePrice {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--activity);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.activityTilePriceSuffix {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.activityTileCheck {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.625rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--activity);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-pill);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}

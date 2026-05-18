@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { Avatar, Badge, Button, Card, EmptyState } from '@/components/ui';
-import { ActivityIcon } from '@/components/activity';
+import { Avatar, Badge, Card, EmptyState } from '@/components/ui';
 import { StatusMessage } from '@/components/StatusMessage';
 import { AppShell } from '@/components/app';
 import { getSessionUser } from '@/lib/auth/session';
-import { ACTIVITY_TYPES, ACTIVITY_TYPE_META, type ActivityType } from '@/lib/types';
+import { ActivityPicker } from './ActivityPicker';
+import { ACTIVITY_TYPES } from '@/lib/types';
 import type { PublicCompanionProfileDTO } from '@/app/api/profiles/_lib/types';
 import styles from './styles.module.css';
 
@@ -87,8 +87,6 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
 
   const headerPhoto = profile.photo_urls[0] ?? null;
   const offered = ACTIVITY_TYPES.filter((a) => profile.activities[a]);
-  const defaultActivity: ActivityType = offered[0] ?? 'lunch';
-  const requestHref = `/requests?companion=${profile.user_id}&activity=${defaultActivity}`;
 
   return (
     <AppShell loginRedirectTo={`/companions/${id}`}>
@@ -122,28 +120,12 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
 
         <section className={styles.section} aria-labelledby="activities-heading">
           <h2 id="activities-heading" className={styles.sectionHeading}>
-            Activities offered
+            Pick an activity
           </h2>
           {offered.length === 0 ? (
             <EmptyState title="No activities listed yet" />
           ) : (
-            <div className={styles.ratesList}>
-              {offered.map((activity) => {
-                const meta = ACTIVITY_TYPE_META[activity];
-                const rate = profile.rates[activity];
-                return (
-                  <div key={activity} className={styles.rateRow} data-activity={activity}>
-                    <span className={styles.rateIcon}>
-                      <ActivityIcon activity={activity} />
-                    </span>
-                    <span className={styles.rateLabel}>{meta.label}</span>
-                    <span className={styles.rateValue}>
-                      {rate !== undefined ? `$${rate}` : '—'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            <ActivityPicker companionId={profile.user_id} offered={offered} rates={profile.rates} />
           )}
         </section>
 
@@ -210,12 +192,6 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
             We&apos;ll show reviews from past meet-ups here as soon as the reviews API ships.
           </EmptyState>
         </section>
-
-        <div className={styles.stickyCta}>
-          <Button as={Link} href={requestHref} fullWidth>
-            Request {ACTIVITY_TYPE_META[defaultActivity].label.toLowerCase()}
-          </Button>
-        </div>
       </main>
     </AppShell>
   );

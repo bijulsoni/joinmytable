@@ -43,7 +43,6 @@ function initials(name: string): string {
 export function DiscoverFeed({ companions, fetchError }: Props) {
   const [activityFilter, setActivityFilter] = useState<ActivityType | null>(null);
   const [areaQuery, setAreaQuery] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return companions.filter((c) => {
@@ -76,6 +75,31 @@ export function DiscoverFeed({ companions, fetchError }: Props) {
         </p>
       </header>
 
+      <label className={styles.areaSearch} htmlFor="discover-area">
+        <span className={styles.areaSearchIcon} aria-hidden>
+          📍
+        </span>
+        <input
+          id="discover-area"
+          type="text"
+          className={styles.areaSearchInput}
+          placeholder="Filter by neighborhood — Kirkland, Bellevue, Seattle…"
+          value={areaQuery}
+          onChange={(e) => setAreaQuery(e.target.value)}
+          autoComplete="off"
+        />
+        {areaQuery ? (
+          <button
+            type="button"
+            className={styles.areaSearchClear}
+            onClick={() => setAreaQuery('')}
+            aria-label="Clear area filter"
+          >
+            ✕
+          </button>
+        ) : null}
+      </label>
+
       <section className={styles.activityRail} aria-label="Filter by activity">
         <button
           type="button"
@@ -99,32 +123,6 @@ export function DiscoverFeed({ companions, fetchError }: Props) {
           </button>
         ))}
       </section>
-
-      <details
-        className={styles.refineDetails}
-        open={filtersOpen}
-        onToggle={(e) => setFiltersOpen((e.target as HTMLDetailsElement).open)}
-      >
-        <summary className={styles.refineSummary}>
-          <span aria-hidden>⚙</span> Refine by area
-        </summary>
-        <div className={styles.refineBody}>
-          <label className={styles.refineLabel}>
-            <span>Service area</span>
-            <input
-              type="text"
-              className={styles.refineInput}
-              placeholder="e.g. Mission, SoMa, Downtown"
-              value={areaQuery}
-              onChange={(e) => setAreaQuery(e.target.value)}
-            />
-          </label>
-          <p className={styles.refineHint}>
-            Filters the feed client-side over already-loaded companions. Full geo search lands in
-            the next phase.
-          </p>
-        </div>
-      </details>
 
       {fetchError ? (
         <div className={styles.errorBanner}>
