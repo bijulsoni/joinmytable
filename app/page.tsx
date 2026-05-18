@@ -5,6 +5,7 @@ import { Button } from '@/components/ui';
 import { ActivityIcon } from '@/components/activity';
 import { getSessionUser } from '@/lib/auth/session';
 import { ACTIVITY_TYPE_META, type ActivityType } from '@/lib/types';
+import { RotatingActivity } from './RotatingActivity';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -13,22 +14,12 @@ export const metadata: Metadata = {
     'A two-sided marketplace for shared-activity companionship. Find a companion for coffee, lunch, happy hour, or dinner.',
 };
 
-// Public landing page. Signed-in visitors are routed straight to the
-// post-auth hub. Signed-out visitors get a warm, mobile-first marketing
-// surface with two paths in: become a seeker or a companion.
-//
-// The hero rotates through the four activities by leaning on the
-// `--activity` custom property so the headline accent stays color-aware
-// without us hard-coding a token.
-
 const ACTIVITY_COPY: Record<ActivityType, string> = {
   coffee: 'A warm cup, a real conversation.',
   lunch: 'Midday break, better with company.',
   happy_hour: 'End the day over a drink.',
   dinner: 'A table set for two.',
 };
-
-const HERO_ACTIVITY: ActivityType = 'lunch';
 
 export default async function HomePage() {
   const user = await getSessionUser();
@@ -40,6 +31,7 @@ export default async function HomePage() {
     <main className={styles.shell}>
       <header className={styles.topbar}>
         <Link href="/" className={styles.wordmark}>
+          <span className={styles.wordmarkMark}>◖</span>
           JoinMyTable
         </Link>
         <Link href="/login" className={styles.topbarLogin}>
@@ -47,11 +39,9 @@ export default async function HomePage() {
         </Link>
       </header>
 
-      <section className={styles.hero} data-activity={HERO_ACTIVITY}>
-        <p className={styles.eyebrow}>Coffee · Lunch · Happy hour · Dinner</p>
-        <h1 className={styles.headline}>
-          Never <span className={styles.headlineSpan}>lunch</span> alone again.
-        </h1>
+      <section className={styles.hero}>
+        <RotatingActivity />
+
         <p className={styles.lede}>
           JoinMyTable matches you with a friendly, verified companion for a meal, a drink, or a
           coffee. You cover the activity and a flat fee. They show up and make it better.
@@ -65,6 +55,16 @@ export default async function HomePage() {
             Become a companion
           </Button>
         </div>
+
+        <p className={styles.heroProof}>
+          <span className={styles.heroProofDots}>
+            <span />
+            <span />
+            <span />
+            <span />
+          </span>
+          Four activities. One warm table. Public venues only.
+        </p>
       </section>
 
       <section className={styles.activities} aria-labelledby="activities-heading">
@@ -77,7 +77,7 @@ export default async function HomePage() {
             return (
               <li key={activity} className={styles.activityCard} data-activity={activity}>
                 <span className={styles.activityIcon}>
-                  <ActivityIcon activity={activity} width={20} height={20} />
+                  <ActivityIcon activity={activity} width={22} height={22} />
                 </span>
                 <span className={styles.activityName}>{meta.label}</span>
                 <p className={styles.activityCopy}>{ACTIVITY_COPY[activity]}</p>
@@ -94,16 +94,26 @@ export default async function HomePage() {
           </h2>
           <ol className={styles.steps}>
             <li>
-              <strong>Sign up.</strong> Be a seeker, a companion, or both — one account, two modes.
+              <span>
+                <strong>Sign up.</strong> Be a seeker, a companion, or both — one account, two
+                modes.
+              </span>
             </li>
             <li>
-              <strong>Find a companion.</strong> Filter by activity, time, and price tier near you.
+              <span>
+                <strong>Find a companion.</strong> Filter by activity, time, and price tier near
+                you.
+              </span>
             </li>
             <li>
-              <strong>Request a meet.</strong> Chat opens the moment your companion accepts.
+              <span>
+                <strong>Request a meet.</strong> Chat opens the moment your companion accepts.
+              </span>
             </li>
             <li>
-              <strong>Meet up.</strong> Your fee is held safely until after the activity wraps.
+              <span>
+                <strong>Meet up.</strong> Your fee is held safely until after the activity wraps.
+              </span>
             </li>
           </ol>
         </div>

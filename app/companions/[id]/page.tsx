@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { Avatar, Badge, Button, Card, EmptyState } from '@/components/ui';
 import { ActivityIcon } from '@/components/activity';
 import { StatusMessage } from '@/components/StatusMessage';
+import { AppShell } from '@/components/app';
 import { getSessionUser } from '@/lib/auth/session';
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_META, type ActivityType } from '@/lib/types';
 import type { PublicCompanionProfileDTO } from '@/app/api/profiles/_lib/types';
@@ -70,11 +71,13 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
 
   if (loadError) {
     return (
-      <main className={styles.shell}>
-        <div className={styles.errorBox}>
-          <StatusMessage tone="error">{loadError}</StatusMessage>
-        </div>
-      </main>
+      <AppShell loginRedirectTo={`/companions/${id}`}>
+        <main className={styles.shell}>
+          <div className={styles.errorBox}>
+            <StatusMessage tone="error">{loadError}</StatusMessage>
+          </div>
+        </main>
+      </AppShell>
     );
   }
 
@@ -88,128 +91,132 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
   const requestHref = `/requests?companion=${profile.user_id}&activity=${defaultActivity}`;
 
   return (
-    <main className={styles.shell}>
-      <div className={styles.headerImage}>
-        {headerPhoto ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={headerPhoto} alt={`${profile.name}'s photo`} />
-        ) : (
-          <div className={styles.headerFallback} aria-hidden>
-            <Avatar src={null} name={profile.name} size={96} />
-          </div>
-        )}
-        <Link href="/discover" className={styles.backLink} aria-label="Back to discover">
-          ‹
-        </Link>
-      </div>
-
-      <section className={styles.summary}>
-        <div className={styles.nameRow}>
-          <h1 className={styles.name}>{profile.name}</h1>
-          <span className={styles.verified}>
-            <span aria-hidden>✓</span> Verified
-          </span>
+    <AppShell loginRedirectTo={`/companions/${id}`}>
+      <main className={styles.shell}>
+        <div className={styles.headerImage}>
+          {headerPhoto ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={headerPhoto} alt={`${profile.name}'s photo`} />
+          ) : (
+            <div className={styles.headerFallback} aria-hidden>
+              <Avatar src={null} name={profile.name} size={96} />
+            </div>
+          )}
+          <Link href="/discover" className={styles.backLink} aria-label="Back to discover">
+            ‹
+          </Link>
         </div>
-        <div className={styles.metaRow}>
-          <span>★ {Number(profile.rating_avg).toFixed(1)}</span>
-          {profile.service_area ? <span>· {profile.service_area}</span> : null}
-        </div>
-      </section>
 
-      <section className={styles.section} aria-labelledby="activities-heading">
-        <h2 id="activities-heading" className={styles.sectionHeading}>
-          Activities offered
-        </h2>
-        {offered.length === 0 ? (
-          <EmptyState title="No activities listed yet" />
-        ) : (
-          <div className={styles.ratesList}>
-            {offered.map((activity) => {
-              const meta = ACTIVITY_TYPE_META[activity];
-              const rate = profile.rates[activity];
-              return (
-                <div key={activity} className={styles.rateRow} data-activity={activity}>
-                  <span className={styles.rateIcon}>
-                    <ActivityIcon activity={activity} />
-                  </span>
-                  <span className={styles.rateLabel}>{meta.label}</span>
-                  <span className={styles.rateValue}>{rate !== undefined ? `$${rate}` : '—'}</span>
-                </div>
-              );
-            })}
+        <section className={styles.summary}>
+          <div className={styles.nameRow}>
+            <h1 className={styles.name}>{profile.name}</h1>
+            <span className={styles.verified}>
+              <span aria-hidden>✓</span> Verified
+            </span>
           </div>
-        )}
-      </section>
-
-      {profile.bio ? (
-        <section className={styles.section} aria-labelledby="bio-heading">
-          <h2 id="bio-heading" className={styles.sectionHeading}>
-            About
-          </h2>
-          <p className={styles.bio}>{profile.bio}</p>
+          <div className={styles.metaRow}>
+            <span>★ {Number(profile.rating_avg).toFixed(1)}</span>
+            {profile.service_area ? <span>· {profile.service_area}</span> : null}
+          </div>
         </section>
-      ) : null}
 
-      <section className={styles.section} aria-labelledby="availability-heading">
-        <h2 id="availability-heading" className={styles.sectionHeading}>
-          Availability
-        </h2>
-        {profile.availability.length === 0 ? (
-          <EmptyState title="No availability windows posted yet">
-            Send a request with your preferred time and {profile.name.split(' ')[0]} can confirm.
-          </EmptyState>
-        ) : (
-          <div className={styles.ratesList}>
-            {profile.availability.map((slot) => (
-              <Card key={slot.id} variant="flat">
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                  }}
-                >
-                  <span style={{ fontWeight: 600 }}>{slot.day_or_date}</span>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>{slot.time_range}</span>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '0.25rem',
-                    marginTop: '0.5rem',
-                  }}
-                >
-                  {slot.activity_types.map((a) => (
-                    <Badge key={a} activity={a} />
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
+        <section className={styles.section} aria-labelledby="activities-heading">
+          <h2 id="activities-heading" className={styles.sectionHeading}>
+            Activities offered
+          </h2>
+          {offered.length === 0 ? (
+            <EmptyState title="No activities listed yet" />
+          ) : (
+            <div className={styles.ratesList}>
+              {offered.map((activity) => {
+                const meta = ACTIVITY_TYPE_META[activity];
+                const rate = profile.rates[activity];
+                return (
+                  <div key={activity} className={styles.rateRow} data-activity={activity}>
+                    <span className={styles.rateIcon}>
+                      <ActivityIcon activity={activity} />
+                    </span>
+                    <span className={styles.rateLabel}>{meta.label}</span>
+                    <span className={styles.rateValue}>
+                      {rate !== undefined ? `$${rate}` : '—'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-      <section className={styles.section} aria-labelledby="reviews-heading">
-        <h2 id="reviews-heading" className={styles.sectionHeading}>
-          Reviews
-        </h2>
-        {/*
+        {profile.bio ? (
+          <section className={styles.section} aria-labelledby="bio-heading">
+            <h2 id="bio-heading" className={styles.sectionHeading}>
+              About
+            </h2>
+            <p className={styles.bio}>{profile.bio}</p>
+          </section>
+        ) : null}
+
+        <section className={styles.section} aria-labelledby="availability-heading">
+          <h2 id="availability-heading" className={styles.sectionHeading}>
+            Availability
+          </h2>
+          {profile.availability.length === 0 ? (
+            <EmptyState title="No availability windows posted yet">
+              Send a request with your preferred time and {profile.name.split(' ')[0]} can confirm.
+            </EmptyState>
+          ) : (
+            <div className={styles.ratesList}>
+              {profile.availability.map((slot) => (
+                <Card key={slot.id} variant="flat">
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{slot.day_or_date}</span>
+                    <span style={{ color: 'var(--color-text-secondary)' }}>{slot.time_range}</span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.25rem',
+                      marginTop: '0.5rem',
+                    }}
+                  >
+                    {slot.activity_types.map((a) => (
+                      <Badge key={a} activity={a} />
+                    ))}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className={styles.section} aria-labelledby="reviews-heading">
+          <h2 id="reviews-heading" className={styles.sectionHeading}>
+            Reviews
+          </h2>
+          {/*
           The /api/reviews/companion/[id] endpoint is not live yet
           (planned for Phase 5 — Trust & Safety). Until then we render a
           friendly placeholder rather than a broken list.
         */}
-        <EmptyState title="Reviews coming soon">
-          We&apos;ll show reviews from past meet-ups here as soon as the reviews API ships.
-        </EmptyState>
-      </section>
+          <EmptyState title="Reviews coming soon">
+            We&apos;ll show reviews from past meet-ups here as soon as the reviews API ships.
+          </EmptyState>
+        </section>
 
-      <div className={styles.stickyCta}>
-        <Button as={Link} href={requestHref} fullWidth>
-          Request {ACTIVITY_TYPE_META[defaultActivity].label.toLowerCase()}
-        </Button>
-      </div>
-    </main>
+        <div className={styles.stickyCta}>
+          <Button as={Link} href={requestHref} fullWidth>
+            Request {ACTIVITY_TYPE_META[defaultActivity].label.toLowerCase()}
+          </Button>
+        </div>
+      </main>
+    </AppShell>
   );
 }

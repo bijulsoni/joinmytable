@@ -1,6 +1,7 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { uploadAvatarAction, type AvatarState } from './actions';
 import styles from '../styles.module.css';
 
@@ -20,15 +21,10 @@ export interface AvatarUploaderProps {
 }
 
 export function AvatarUploader({ currentAvatarUrl }: AvatarUploaderProps) {
-  const [state, formAction] = useFormState(uploadAvatarAction, INITIAL);
+  const [state, formAction] = useActionState(uploadAvatarAction, INITIAL);
 
   return (
-    <form
-      action={formAction}
-      className={styles.form}
-      encType="multipart/form-data"
-      noValidate
-    >
+    <form action={formAction} className={styles.form} encType="multipart/form-data" noValidate>
       {currentAvatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img

@@ -1,6 +1,7 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { forgotPasswordAction, type ForgotState } from './actions';
 import styles from '../styles.module.css';
@@ -17,7 +18,7 @@ function SubmitButton() {
 }
 
 export function ForgotForm() {
-  const [state, formAction] = useFormState(forgotPasswordAction, INITIAL);
+  const [state, formAction] = useActionState(forgotPasswordAction, INITIAL);
 
   if (state.status === 'sent') {
     return (

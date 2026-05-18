@@ -1,0 +1,120 @@
+import 'server-only';
+
+// GET  /api/messaging/[bookingId] — list messages for a booking thread.
+// POST /api/messaging/[bookingId] — send a new message.
+//
+// Authorization: RLS gates both. The participant check uses the
+// is_booking_participant(uuid) helper. System messages (state-change
+// markers) are inserted by other endpoints via the admin client; this
+// route only handles user-authored messages and rejects attempts to
+// impersonate a system message.
+
+import { NextResponse, type NextRequest } from 'next/server';
+import { z } from 'zod';
+import { apiError, parseJsonBody, requireAuth } from '@/app/api/_lib';
+import { uuidSchema } from '@/app/api/_lib/validators';
+
+const sendMessageSchema = z.object({
+  body: z.string().trim().min(1, 'Message cannot be empty.').max(4000, 'Message is too long.'),
+});
+
+interface MessageRow {
+  id: string;
+  booking_id: string;
+  sender_id: string | null;
+  body: string;
+  is_system_message: boolean;
+  sent_at: string;
+}
+
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ bookingId: string }> }) {
+  const guard = await requireAuth();
+  if (!guard.ok) return guard.response;
+  const { caller } = guard;
+
+  const { bookingId: rawId } = await ctx.params;
+  const idResult = uuidSchema.safeParse(rawId);
+  if (!idResult.success) {
+    return apiError('invalid_input', 'Invalid booking id.');
+  }
+  const bookingId = idResult.data;
+
+  // Confirm the booking exists + caller is a participant (via RLS).
+  const { data: booking, error: bookingErr } = await caller.supabase
+    .from('bookings')
+    .select('id')
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (bookingErr) {
+    return apiError('internal_error', `Could not verify booking: ${bookingErr.message}`);
+  }
+  if (!booking) {
+    return apiError('not_found', 'Booking not found.');
+  }
+
+  const { data, error } = await caller.supabase
+    .from('messages')
+    .select('id, booking_id, sender_id, body, is_system_message, sent_at')
+    .eq('booking_id', bookingId)
+    .order('sent_at', { ascending: true })
+    .limit(500);
+
+  if (error) {
+    return apiError('internal_error', `Could not load messages: ${error.message}`);
+  }
+
+  return NextResponse.json({ messages: (data ?? []) as MessageRow[] });
+}
+
+export async function POST(req: NextRequest, ctx: { params: Promise<{ bookingId: string }> }) {
+  const guard = await requireAuth();
+  if (!guard.ok) return guard.response;
+  const { caller } = guard;
+
+  const { bookingId: rawId } = await ctx.params;
+  const idResult = uuidSchema.safeParse(rawId);
+  if (!idResult.success) {
+    return apiError('invalid_input', 'Invalid booking id.');
+  }
+  const bookingId = idResult.data;
+
+  const body = await parseJsonBody(req, sendMessageSchema);
+  if (!body.ok) return body.response;
+
+  // Confirm booking exists + caller is a participant (RLS check).
+  const { data: booking, error: bookingErr } = await caller.supabase
+    .from('bookings')
+    .select('id, status')
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (bookingErr) {
+    return apiError('internal_error', `Could not verify booking: ${bookingErr.message}`);
+  }
+  if (!booking) {
+    return apiError('not_found', 'Booking not found.');
+  }
+  const status = (booking as { id: string; status: string }).status;
+  if (status === 'cancelled') {
+    return apiError('conflict', 'Cannot message on a cancelled booking.');
+  }
+
+  // Insert via the request-scoped client. RLS policy
+  // messages_insert_participant enforces is_system_message != true and
+  // sender_id = auth.uid().
+  const { data: inserted, error: insertErr } = await caller.supabase
+    .from('messages')
+    .insert({
+      booking_id: bookingId,
+      sender_id: caller.userId,
+      body: body.data.body,
+      is_system_message: false,
+    })
+    .select('id, booking_id, sender_id, body, is_system_message, sent_at')
+    .single();
+
+  if (insertErr || !inserted) {
+    return apiError('internal_error', `Could not send message: ${insertErr?.message ?? 'no row'}`);
+  }
+
+  return NextResponse.json({ message: inserted as MessageRow }, { status: 201 });
+}

@@ -1,7 +1,5 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { BottomNav, BottomNavSpacer } from '@/components/ui';
-import { getSessionUser } from '@/lib/auth/session';
+import { AppShell } from '@/components/app';
 import { BookingsList } from './BookingsList';
 
 export const metadata: Metadata = {
@@ -10,16 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default async function BookingsPage() {
-  const user = await getSessionUser();
-  if (!user) {
-    redirect('/login?next=/bookings');
-  }
-
   return (
-    <>
+    <AppShell loginRedirectTo="/bookings">
       <BookingsList />
-      <BottomNavSpacer />
-      <BottomNav />
-    </>
+    </AppShell>
   );
 }

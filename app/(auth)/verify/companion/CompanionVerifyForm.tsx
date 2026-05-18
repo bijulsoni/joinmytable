@@ -1,10 +1,8 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
-import {
-  submitCompanionVerificationAction,
-  type CompanionVerifyState,
-} from './actions';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { submitCompanionVerificationAction, type CompanionVerifyState } from './actions';
 import styles from '../../styles.module.css';
 
 const INITIAL: CompanionVerifyState = { status: 'idle' };
@@ -19,18 +17,10 @@ function SubmitButton() {
 }
 
 export function CompanionVerifyForm() {
-  const [state, formAction] = useFormState(
-    submitCompanionVerificationAction,
-    INITIAL,
-  );
+  const [state, formAction] = useActionState(submitCompanionVerificationAction, INITIAL);
 
   return (
-    <form
-      action={formAction}
-      className={styles.form}
-      noValidate
-      encType="multipart/form-data"
-    >
+    <form action={formAction} className={styles.form} noValidate encType="multipart/form-data">
       <div className={styles.field}>
         <label htmlFor="legalName" className={styles.label}>
           Full legal name (as on your ID)
@@ -59,8 +49,7 @@ export function CompanionVerifyForm() {
           className={styles.input}
         />
         <p className={styles.helpText}>
-          JPG, PNG, WEBP, or HEIC. Up to 10 MB. Stored privately - only the
-          review team can see it.
+          JPG, PNG, WEBP, or HEIC. Up to 10 MB. Stored privately - only the review team can see it.
         </p>
       </div>
 

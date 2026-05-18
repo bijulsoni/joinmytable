@@ -1,25 +1,39 @@
-/* Mobile-first base styles. Build phone-up; expand at min-width breakpoints. */
+/* JoinMyTable design system.
+ *
+ * Mobile-first. Built phone-up; expanded at the breakpoints below.
+ *
+ * The palette is warm and food-friendly. The four activity colors
+ * (coffee/lunch/happy_hour/dinner) define the brand accent rotation;
+ * a deep teal "ink" grounds the rest of the UI as the neutral CTA color.
+ */
 
 :root {
   /* Activity branding (CLAUDE.md core rule #1: only four activity types). */
-  --color-coffee: #d4860b;
+  --color-coffee: #b46a1e;
   --color-coffee-soft: #fbeed3;
-  --color-lunch: #2d7d46;
+  --color-coffee-tint: #fff6e4;
+  --color-lunch: #2e7d4f;
   --color-lunch-soft: #d8ecdd;
+  --color-lunch-tint: #ecf6ee;
   --color-happy-hour: #c45c1a;
-  --color-happy-hour-soft: #f9e0cc;
-  --color-dinner: #5b3b8c;
-  --color-dinner-soft: #e3daf2;
+  --color-happy-hour-soft: #f9dec5;
+  --color-happy-hour-tint: #fdedde;
+  --color-dinner: #6b3f9b;
+  --color-dinner-soft: #e6dcf3;
+  --color-dinner-tint: #f1eaf9;
 
-  /* Neutrals. */
-  --color-background: #fafaf8;
+  /* Warm neutrals — cream-paper backgrounds, espresso-leaning text. */
+  --color-background: #fdf8f1;
+  --color-background-deep: #f5ecdf;
   --color-surface: #ffffff;
-  --color-surface-muted: #f3f1ec;
-  --color-text-primary: #1a1a18;
-  --color-text-secondary: #5f5e5a;
+  --color-surface-muted: #f6efe3;
+  --color-surface-elev: #ffffff;
+  --color-text-primary: #1f1a14;
+  --color-text-secondary: #6b6357;
+  --color-text-tertiary: #94897a;
   --color-text-inverse: #ffffff;
-  --color-border: #e8e6e0;
-  --color-border-strong: #d4d1c8;
+  --color-border: #ece4d3;
+  --color-border-strong: #d6cab2;
 
   /* Status accents. */
   --color-danger: #b3261e;
@@ -29,21 +43,44 @@
   --color-warning: #8c5b00;
   --color-warning-soft: #fbeed3;
 
-  /* Brand accent (used for primary CTAs that are not activity-scoped). */
-  --color-accent: #1f5e7a;
-  --color-accent-hover: #174a61;
-  --color-accent-soft: #e2eef3;
+  /* Brand accent — deep teal "ink" that grounds the warm palette. */
+  --color-ink: #1f4756;
+  --color-ink-strong: #15323d;
+  --color-ink-soft: #dfeaef;
+  --color-accent: var(--color-ink);
+  --color-accent-hover: var(--color-ink-strong);
+  --color-accent-soft: var(--color-ink-soft);
+
+  /* Gradients. */
+  --gradient-warm: radial-gradient(
+    1200px 600px at 50% -10%,
+    rgba(241, 198, 134, 0.45),
+    transparent 60%
+  );
+  --gradient-card: linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 1));
+  --gradient-cta: linear-gradient(180deg, #1f4756 0%, #15323d 100%);
+
+  /* Typography. */
+  --font-display:
+    var(--font-display), 'Fraunces', 'Cooper Black', 'Iowan Old Style', Georgia, serif;
+  --font-body:
+    var(--font-body), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 
   /* Radii. */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
   --radius-pill: 999px;
 
   /* Elevation. */
-  --shadow-sm: 0 1px 2px rgba(20, 18, 14, 0.05);
-  --shadow-md: 0 4px 12px rgba(20, 18, 14, 0.08);
-  --shadow-lg: 0 12px 32px rgba(20, 18, 14, 0.12);
+  --shadow-xs: 0 1px 2px rgba(34, 25, 15, 0.04);
+  --shadow-sm: 0 2px 6px rgba(34, 25, 15, 0.06);
+  --shadow-md: 0 8px 24px rgba(34, 25, 15, 0.08);
+  --shadow-lg: 0 20px 48px rgba(34, 25, 15, 0.12);
+  --shadow-xl: 0 32px 64px rgba(34, 25, 15, 0.18);
+  --shadow-focus: 0 0 0 4px var(--color-ink-soft);
 
   /* Spacing scale. */
   --space-1: 0.25rem;
@@ -56,11 +93,18 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
 
+  /* Motion. */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 360ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
   /* Layout. */
   --bp-tablet: 600px;
   --bp-desktop: 960px;
   --bottom-nav-height: 64px;
-  --container-max: 30rem; /* mobile-first; phone viewport is the design target */
+  --container-max: 30rem;
 }
 
 *,
@@ -74,17 +118,19 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Oxygen, Ubuntu, Cantarell,
-    sans-serif;
+  font-family: var(--font-body);
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--color-background);
+  background: var(--gradient-warm), var(--color-background);
+  background-attachment: fixed;
   color: var(--color-text-primary);
-  line-height: 1.5;
+  line-height: 1.55;
+  font-feature-settings: 'cv11', 'ss01';
 }
 
 img,
@@ -96,32 +142,58 @@ svg {
 button {
   font: inherit;
   cursor: pointer;
+  font-family: inherit;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 
 a {
   color: var(--color-accent);
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 a:hover {
   color: var(--color-accent-hover);
 }
 
-/* Activity-scoped helper attribute. Place `data-activity="coffee"` on any
-   element to expose `--activity` / `--activity-soft` to its subtree so
-   per-activity components stay color-aware without conditional classes. */
+::selection {
+  background: var(--color-ink-soft);
+  color: var(--color-ink-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Activity-scoped helper attribute. */
 [data-activity='coffee'] {
   --activity: var(--color-coffee);
   --activity-soft: var(--color-coffee-soft);
+  --activity-tint: var(--color-coffee-tint);
 }
 [data-activity='lunch'] {
   --activity: var(--color-lunch);
   --activity-soft: var(--color-lunch-soft);
+  --activity-tint: var(--color-lunch-tint);
 }
 [data-activity='happy_hour'] {
   --activity: var(--color-happy-hour);
   --activity-soft: var(--color-happy-hour-soft);
+  --activity-tint: var(--color-happy-hour-tint);
 }
 [data-activity='dinner'] {
   --activity: var(--color-dinner);
   --activity-soft: var(--color-dinner-soft);
+  --activity-tint: var(--color-dinner-tint);
 }

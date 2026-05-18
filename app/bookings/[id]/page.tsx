@@ -1,11 +1,9 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
-import { BottomNav, BottomNavSpacer } from '@/components/ui';
-import { getSessionUser } from '@/lib/auth/session';
+import { AppShell } from '@/components/app';
 import { ConfirmAndPay } from './ConfirmAndPay';
 
 export const metadata: Metadata = {
-  title: 'Confirm & pay',
+  title: 'Booking',
 };
 
 interface RouteContext {
@@ -14,16 +12,9 @@ interface RouteContext {
 
 export default async function BookingDetailPage(ctx: RouteContext) {
   const { id } = await ctx.params;
-  const user = await getSessionUser();
-  if (!user) {
-    redirect(`/login?next=/bookings/${id}`);
-  }
-
   return (
-    <>
+    <AppShell loginRedirectTo={`/bookings/${id}`}>
       <ConfirmAndPay bookingId={id} />
-      <BottomNavSpacer />
-      <BottomNav />
-    </>
+    </AppShell>
   );
 }

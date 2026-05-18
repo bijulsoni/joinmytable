@@ -10,7 +10,7 @@
 
 import { logger } from '@/lib/logger';
 
-import { FROM_EMAIL, isEmailConfigured, resend } from './client';
+import { FROM_EMAIL, getResend, isEmailConfigured } from './client';
 import type { EmailTemplate } from './templates/_shared';
 
 const log = logger.child({ module: 'email/send' });
@@ -48,8 +48,13 @@ export async function sendEmail<TData extends Record<string, unknown>>(
     return { success: false, error: 'template_render_failed' };
   }
 
+  const client = getResend();
+  if (!client) {
+    log.warn({ to: redactEmail(to) }, 'resend client not available');
+    return { success: false, error: 'email_not_configured' };
+  }
   try {
-    const result = await resend.emails.send({
+    const result = await client.emails.send({
       from: FROM_EMAIL,
       to,
       subject: content.subject,

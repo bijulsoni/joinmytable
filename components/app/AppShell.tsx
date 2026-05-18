@@ -1,0 +1,78 @@
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { requireSessionUser } from '@/lib/auth/session';
+import { BottomNav, BottomNavSpacer } from '@/components/ui';
+import { UserMenu } from './UserMenu';
+import styles from './AppShell.module.css';
+
+// Shared app shell for every signed-in route.
+//
+//   - Top header: wordmark on the left, primary nav on the desktop center,
+//     user menu (Profile / Verification / Sign out) on the right.
+//   - Sticky on scroll, frosted background.
+//   - On mobile, primary nav lives in the BottomNav (hidden on desktop);
+//     the user menu is always in the header.
+//
+// Use as a wrapper inside every signed-in page so navigation feels
+// consistent. Replaces ad-hoc page chrome.
+
+interface AppShellProps {
+  children: React.ReactNode;
+  /**
+   * When true, redirects to /login if no session. Defaults to true since
+   * AppShell is intended for signed-in routes.
+   */
+  requireAuth?: boolean;
+  /** Optional path to redirect to after login. */
+  loginRedirectTo?: string;
+}
+
+function initialsOf(name: string | null | undefined, fallback: string): string {
+  const n = (name ?? '').trim();
+  if (!n) return fallback.slice(0, 2).toUpperCase();
+  const parts = n.split(/\s+/);
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+}
+
+export async function AppShell({ children, requireAuth = true, loginRedirectTo }: AppShellProps) {
+  const user = await requireSessionUser(
+    loginRedirectTo ? `/login?next=${encodeURIComponent(loginRedirectTo)}` : '/login',
+  );
+  if (!requireAuth) {
+    // The require call above will redirect; ignore the unauth branch.
+  }
+
+  const name = user.profile?.name ?? user.email;
+  const initials = initialsOf(user.profile?.name ?? null, user.email);
+
+  return (
+    <div className={styles.appShell}>
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <Link href="/discover" className={styles.wordmark}>
+            <span className={styles.wordmarkMark}>◖</span>
+            JoinMyTable
+          </Link>
+          <nav className={styles.nav} aria-label="Primary">
+            <Link href="/discover" className={styles.navLink}>
+              Discover
+            </Link>
+            <Link href="/bookings" className={styles.navLink}>
+              Bookings
+            </Link>
+            <Link href="/chat" className={styles.navLink}>
+              Messages
+            </Link>
+          </nav>
+          <div className={styles.right}>
+            <UserMenu name={name} email={user.email} initials={initials} />
+          </div>
+        </div>
+      </header>
+      <main className={styles.main}>{children}</main>
+      <BottomNavSpacer />
+      <BottomNav />
+    </div>
+  );
+}

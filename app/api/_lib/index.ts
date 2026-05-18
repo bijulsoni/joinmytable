@@ -3,7 +3,7 @@
 
 export { apiError, type ApiErrorBody, type ApiErrorCode } from './errors';
 export { parseJsonBody } from './parse';
-export { apiServerClient, type LooseSupabaseClient } from './supabase';
+export { apiServerClient, apiAdminClient, type LooseSupabaseClient } from './supabase';
 export {
   requireAuth,
   requireCompanionMode,

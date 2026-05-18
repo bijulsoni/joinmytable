@@ -1,6 +1,7 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { setModesAction, type ModeState } from './actions';
 import styles from '../styles.module.css';
 
@@ -20,35 +21,22 @@ export interface ModeSwitcherProps {
   initialIsCompanion: boolean;
 }
 
-export function ModeSwitcher({
-  initialIsSeeker,
-  initialIsCompanion,
-}: ModeSwitcherProps) {
-  const [state, formAction] = useFormState(setModesAction, INITIAL);
+export function ModeSwitcher({ initialIsSeeker, initialIsCompanion }: ModeSwitcherProps) {
+  const [state, formAction] = useActionState(setModesAction, INITIAL);
 
   return (
     <form action={formAction} className={styles.form} noValidate>
       <div className={styles.modeRow}>
         <strong className={styles.label}>Active modes</strong>
         <label className={styles.checkboxRow}>
-          <input
-            type="checkbox"
-            name="isSeeker"
-            defaultChecked={initialIsSeeker}
-          />
+          <input type="checkbox" name="isSeeker" defaultChecked={initialIsSeeker} />
           Seeker - request meals with companions.
         </label>
         <label className={styles.checkboxRow}>
-          <input
-            type="checkbox"
-            name="isCompanion"
-            defaultChecked={initialIsCompanion}
-          />
+          <input type="checkbox" name="isCompanion" defaultChecked={initialIsCompanion} />
           Companion - be matched with seekers.
         </label>
-        <p className={styles.helpText}>
-          One account, two modes - you can run as both.
-        </p>
+        <p className={styles.helpText}>One account, two modes - you can run as both.</p>
       </div>
       {state.status === 'error' && (
         <div className={styles.error} role="alert">

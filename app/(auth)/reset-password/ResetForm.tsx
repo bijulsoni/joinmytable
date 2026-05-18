@@ -1,6 +1,7 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { resetPasswordAction, type ResetState } from './actions';
 import styles from '../styles.module.css';
 
@@ -16,7 +17,7 @@ function SubmitButton() {
 }
 
 export function ResetForm() {
-  const [state, formAction] = useFormState(resetPasswordAction, INITIAL);
+  const [state, formAction] = useActionState(resetPasswordAction, INITIAL);
 
   return (
     <form action={formAction} className={styles.form} noValidate>

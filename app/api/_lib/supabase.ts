@@ -16,3 +16,16 @@ export type LooseSupabaseClient = SupabaseClient<any, any, any, any>;
 export async function apiServerClient(): Promise<LooseSupabaseClient> {
   return (await createSupabaseServerClient()) as unknown as LooseSupabaseClient;
 }
+
+import { createSupabaseAdminClient } from '@/lib/supabase/server';
+
+/**
+ * Loose-typed admin client for service-role inserts/updates (bookings,
+ * payments, system messages). The strict typegen on the frozen Database
+ * type collapses some inserts to `never`; we re-narrow inputs at the
+ * boundary instead. RLS is not in play because the admin client bypasses
+ * it; callers must enforce auth/authorization in code.
+ */
+export function apiAdminClient(): LooseSupabaseClient {
+  return createSupabaseAdminClient() as unknown as LooseSupabaseClient;
+}

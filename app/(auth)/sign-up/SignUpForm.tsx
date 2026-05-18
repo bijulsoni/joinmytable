@@ -1,6 +1,7 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { signUpAction, type SignUpState } from './actions';
 import styles from '../styles.module.css';
@@ -17,7 +18,7 @@ function SubmitButton() {
 }
 
 export function SignUpForm() {
-  const [state, formAction] = useFormState(signUpAction, INITIAL);
+  const [state, formAction] = useActionState(signUpAction, INITIAL);
 
   return (
     <form action={formAction} className={styles.form} noValidate>
