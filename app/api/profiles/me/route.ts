@@ -13,7 +13,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { apiError, parseJsonBody, requireAuth, requireCompanionMode } from '@/app/api/_lib';
+import { apiError, parseJsonBody, requireAuth } from '@/app/api/_lib';
 import { toOwnCompanionProfileDTO, type OwnCompanionProfileDTO } from '../_lib/types';
 import { companionProfileUpsertSchema } from '../_lib/validators';
 import type { CompanionProfileRow, CompanionProfileUpdate, UserRow } from '@/lib/types';
@@ -46,7 +46,7 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PUT(request: NextRequest): Promise<NextResponse> {
-  const auth = await requireCompanionMode();
+  const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { caller } = auth;
 
@@ -110,7 +110,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function DELETE(): Promise<NextResponse> {
-  const auth = await requireCompanionMode();
+  const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { caller } = auth;
 

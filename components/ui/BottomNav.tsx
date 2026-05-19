@@ -50,21 +50,9 @@ const ITEMS: NavItem[] = [
     ),
   },
   {
-    href: '/requests',
-    label: 'Requests',
-    matchPrefixes: ['/requests'],
-    icon: (
-      <svg {...ICON_PROPS}>
-        <path d="M4 6h16" />
-        <path d="M4 12h10" />
-        <path d="M4 18h16" />
-      </svg>
-    ),
-  },
-  {
-    href: '/bookings',
-    label: 'Bookings',
-    matchPrefixes: ['/bookings'],
+    href: '/plans',
+    label: 'Plans',
+    matchPrefixes: ['/plans', '/bookings', '/requests'],
     icon: (
       <svg {...ICON_PROPS}>
         <rect x="4" y="5" width="16" height="16" rx="2" />

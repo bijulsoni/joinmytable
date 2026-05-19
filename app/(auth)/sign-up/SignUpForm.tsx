@@ -69,23 +69,14 @@ export function SignUpForm() {
         <p className={styles.helpText}>At least 8 characters.</p>
       </div>
 
-      <div className={styles.modeRow}>
-        <strong className={styles.label}>How do you want to use JoinMyTable?</strong>
-        <label className={styles.checkboxRow}>
-          <input type="checkbox" name="isSeeker" defaultChecked />
-          I&apos;m a seeker - I&apos;d like to share meals with companions.
-        </label>
-        <label className={styles.checkboxRow}>
-          <input type="checkbox" name="isCompanion" />
-          I&apos;m a companion - I&apos;d like to be matched with seekers.
-        </label>
-        <p className={styles.helpText}>One account, two modes - you can change this any time.</p>
-      </div>
-
       <label className={styles.checkboxRow}>
         <input type="checkbox" name="acceptGuidelines" required />
         I&apos;ve read and accept the community guidelines.
       </label>
+      <p className={styles.helpText}>
+        Want to be paid to share a meal as a companion? You can set that up from your profile after
+        sign-up.
+      </p>
 
       {state.status === 'error' && (
         <div className={styles.error} role="alert">

@@ -39,18 +39,51 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ bookingId:
   }
   const bookingId = idResult.data;
 
-  // Confirm the booking exists + caller is a participant (via RLS).
-  const { data: booking, error: bookingErr } = await caller.supabase
+  // Confirm the booking exists + caller is a participant (RLS).
+  // Return a booking summary alongside the messages so the chat UI can
+  // tag bubbles as sent vs received without a second round-trip.
+  const { data: bookingRaw, error: bookingErr } = await caller.supabase
     .from('bookings')
-    .select('id')
+    .select(
+      `id, activity_type, venue_name, venue_location, scheduled_time, status,
+       meal_requests!bookings_request_id_fkey(
+         seeker_id,
+         companion_id,
+         seeker:users!meal_requests_seeker_id_fkey(name),
+         companion:users!meal_requests_companion_id_fkey(name)
+       )`,
+    )
     .eq('id', bookingId)
     .maybeSingle();
   if (bookingErr) {
     return apiError('internal_error', `Could not verify booking: ${bookingErr.message}`);
   }
-  if (!booking) {
+  if (!bookingRaw) {
     return apiError('not_found', 'Booking not found.');
   }
+  const b = bookingRaw as unknown as {
+    id: string;
+    activity_type: string;
+    venue_name: string;
+    venue_location: string;
+    scheduled_time: string;
+    status: string;
+    meal_requests: {
+      seeker_id: string;
+      companion_id: string;
+      seeker: { name: string | null } | null;
+      companion: { name: string | null } | null;
+    } | null;
+  };
+  if (!b.meal_requests) {
+    return apiError('not_found', 'Booking is missing its request linkage.');
+  }
+  const seekerId = b.meal_requests.seeker_id;
+  const companionId = b.meal_requests.companion_id;
+  const counterpartName =
+    seekerId === caller.userId
+      ? (b.meal_requests.companion?.name ?? 'A companion')
+      : (b.meal_requests.seeker?.name ?? 'A seeker');
 
   const { data, error } = await caller.supabase
     .from('messages')
@@ -63,7 +96,20 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ bookingId:
     return apiError('internal_error', `Could not load messages: ${error.message}`);
   }
 
-  return NextResponse.json({ messages: (data ?? []) as MessageRow[] });
+  return NextResponse.json({
+    booking: {
+      id: b.id,
+      activity_type: b.activity_type,
+      venue_name: b.venue_name,
+      venue_location: b.venue_location,
+      scheduled_time: b.scheduled_time,
+      status: b.status,
+      counterpart_name: counterpartName,
+      counterpart_photo_url: null,
+      caller_user_id: caller.userId,
+    },
+    messages: (data ?? []) as MessageRow[],
+  });
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ bookingId: string }> }) {

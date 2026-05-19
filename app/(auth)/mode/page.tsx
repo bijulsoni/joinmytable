@@ -1,26 +1,9 @@
-import type { Metadata } from 'next';
-import { requireSessionUser } from '@/lib/auth/session';
-import { ModeSwitcher } from './ModeSwitcher';
-import styles from '../styles.module.css';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'Modes',
-};
-
-export default async function ModePage() {
-  const user = await requireSessionUser();
-  const profile = user.profile;
-
-  return (
-    <div className={styles.card}>
-      <h1 className={styles.heading}>Choose your modes</h1>
-      <p className={styles.subheading}>
-        Switch between seeker and companion any time.
-      </p>
-      <ModeSwitcher
-        initialIsSeeker={profile?.is_seeker ?? true}
-        initialIsCompanion={profile?.is_companion ?? false}
-      />
-    </div>
-  );
+// /mode used to expose a "switch seeker / companion mode" toggle.
+// The mode split was removed when we unified the role-less UI; the
+// only remaining "am I available as a companion?" affordance lives
+// on /profile. Permanent redirect for any bookmarked /mode URLs.
+export default function ModeRedirect() {
+  redirect('/profile');
 }

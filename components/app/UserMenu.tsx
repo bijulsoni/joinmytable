@@ -73,9 +73,6 @@ export function UserMenu({ name, email, initials }: UserMenuProps) {
           >
             <span aria-hidden>✓</span> Identity &amp; verification
           </Link>
-          <Link href="/mode" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
-            <span aria-hidden>↔</span> Switch mode
-          </Link>
           <div className={styles.divider} aria-hidden />
           <form action="/logout" method="post" className={styles.signoutForm}>
             <button type="submit" className={`${styles.item} ${styles.signout}`} role="menuitem">

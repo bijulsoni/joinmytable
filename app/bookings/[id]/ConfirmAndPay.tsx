@@ -34,11 +34,12 @@ interface BookingDetail {
   scheduled_time: string;
   budget_tier: BudgetTier;
   status: BookingStatus;
-  companion_fee: string;
-  companion_name: string;
-  companion_photo_url: string | null;
+  companion_fee: number | string;
+  /** The other party's name. Null only if they were deleted. */
+  counterpart_name: string | null;
   /** Caller's role on this booking. */
   caller_role: 'seeker' | 'companion';
+  escrow_status: 'held' | 'released' | 'refunded' | null;
 }
 
 interface ApiErrorBody {
@@ -181,9 +182,11 @@ export function ConfirmAndPay({ bookingId }: ConfirmAndPayProps) {
               marginBottom: '0.875rem',
             }}
           >
-            <Avatar src={booking.companion_photo_url} name={booking.companion_name} size={48} />
+            <Avatar name={booking.counterpart_name ?? 'A companion'} size={48} />
             <div style={{ minWidth: 0 }}>
-              <p style={{ margin: 0, fontWeight: 600 }}>{booking.companion_name}</p>
+              <p style={{ margin: 0, fontWeight: 600 }}>
+                {booking.counterpart_name ?? 'A companion'}
+              </p>
               <Badge activity={booking.activity_type}>{meta.label}</Badge>
             </div>
           </div>

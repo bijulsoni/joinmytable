@@ -1,20 +1,11 @@
-import type { Metadata } from 'next';
-import { AppShell } from '@/components/app';
-import { ConfirmAndPay } from './ConfirmAndPay';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'Booking',
-};
-
+// /bookings/[id] now lives at /plans/by-booking/[id] (which then 308s
+// to /plans/[request_id]). Permanent redirect for backwards compat.
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
-
-export default async function BookingDetailPage(ctx: RouteContext) {
+export default async function BookingDetailRedirect(ctx: RouteContext) {
   const { id } = await ctx.params;
-  return (
-    <AppShell loginRedirectTo={`/bookings/${id}`}>
-      <ConfirmAndPay bookingId={id} />
-    </AppShell>
-  );
+  redirect(`/plans/by-booking/${id}`);
 }

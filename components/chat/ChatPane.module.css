@@ -1,0 +1,215 @@
+.pane {
+  width: 320px;
+  height: 440px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+@media (max-width: 600px) {
+  .pane {
+    width: min(96vw, 360px);
+    height: min(78vh, 520px);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  background: var(--color-ink);
+  color: var(--color-text-inverse);
+}
+
+.headerName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.headerTitle {
+  font-weight: 600;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.headerBtn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.headerBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  background: var(--color-background);
+}
+
+.empty,
+.error {
+  margin: auto;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.375rem;
+  max-width: 88%;
+}
+
+.rowSent {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.rowReceived {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.senderLabel {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  margin: 0 0.375rem 0.125rem;
+}
+
+.bubble {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+  box-shadow: var(--shadow-xs);
+}
+
+.bubbleSent {
+  background: var(--gradient-cta);
+  color: var(--color-text-inverse);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.bubbleReceived {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.timestamp {
+  margin: 0.125rem 0.5rem 0;
+  font-size: 0.625rem;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.system {
+  align-self: center;
+  margin: 0.5rem 0;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  font-style: italic;
+  text-align: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-pill);
+  max-width: 90%;
+}
+
+.composer {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.composerField {
+  flex: 1;
+  appearance: none;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-background);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.625rem;
+  font-size: 0.9375rem;
+  min-height: 36px;
+  max-height: 6rem;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.3;
+}
+
+.composerField:focus-visible {
+  outline: none;
+  border-color: var(--color-ink);
+  box-shadow: var(--shadow-focus);
+}
+
+.sendButton {
+  appearance: none;
+  border: 0;
+  background: var(--gradient-cta);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-pill);
+  padding: 0 0.875rem;
+  height: 36px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.sendButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

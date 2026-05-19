@@ -1,0 +1,243 @@
+.shell {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 5rem;
+  width: 100%;
+}
+
+.header {
+  margin-bottom: 0.875rem;
+}
+
+.back {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--color-text-primary);
+}
+
+.errorBox {
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-danger-soft);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+  color: var(--color-danger);
+  font-size: 0.9375rem;
+}
+
+/* -------- Profile card ----------------------------------------- */
+
+.profileCard {
+  display: flex;
+  gap: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  align-items: center;
+}
+
+.photo {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.photoFallback {
+  flex-shrink: 0;
+}
+
+.profileMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.profileLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.profileName {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: -0.015em;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-variation-settings:
+    'opsz' 32,
+    'SOFT' 50;
+}
+
+.verifiedPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  width: fit-content;
+}
+
+.profileMetaLine {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+/* -------- Sections --------------------------------------------- */
+
+.section {
+  margin-bottom: 1.5rem;
+}
+
+.h2 {
+  margin: 0 0 0.625rem 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  letter-spacing: -0.005em;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-variation-settings:
+    'opsz' 24,
+    'SOFT' 50;
+}
+
+.bio {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--color-text-primary);
+}
+
+/* -------- Request details -------------------------------------- */
+
+.detailsCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detailRow {
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detailRow:last-child {
+  border-bottom: 0;
+}
+
+.detailLabel {
+  flex-shrink: 0;
+  width: 5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  padding-top: 0.125rem;
+}
+
+.detailValue {
+  flex: 1;
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.fee {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.messageQuote {
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+/* -------- Status pill ------------------------------------------ */
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--radius-pill);
+}
+
+.status_requested {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.status_accepted {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.status_declined {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+/* -------- CTA row ---------------------------------------------- */
+
+.ctaRow {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.respondRow {
+  display: flex;
+  gap: 0.625rem;
+}
+
+.helper {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.error {
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}

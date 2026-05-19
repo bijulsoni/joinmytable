@@ -10,7 +10,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { apiError, parseJsonBody, requireCompanionMode, uuidSchema } from '@/app/api/_lib';
+import { apiError, parseJsonBody, requireAuth, uuidSchema } from '@/app/api/_lib';
 import { toAvailabilityDTO } from '../../../_lib/types';
 import { availabilityUpdateSchema } from '../../../_lib/validators';
 import type { AvailabilityRow, CompanionProfileRow } from '@/lib/types';
@@ -41,7 +41,7 @@ export async function PUT(request: NextRequest, ctx: RouteContext): Promise<Next
     return apiError('not_found', 'Availability window not found.');
   }
 
-  const auth = await requireCompanionMode();
+  const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { caller } = auth;
 
@@ -79,7 +79,7 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext): Promise<
     return apiError('not_found', 'Availability window not found.');
   }
 
-  const auth = await requireCompanionMode();
+  const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { caller } = auth;
 

@@ -11,7 +11,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { apiError, parseJsonBody, requireCompanionMode } from '@/app/api/_lib';
+import { apiError, parseJsonBody, requireAuth } from '@/app/api/_lib';
 import { toAvailabilityDTO } from '../../_lib/types';
 import { availabilityCreateSchema } from '../../_lib/validators';
 import type { AvailabilityRow, CompanionProfileRow } from '@/lib/types';
@@ -35,7 +35,7 @@ async function loadProfileId(
 }
 
 export async function GET(): Promise<NextResponse> {
-  const auth = await requireCompanionMode();
+  const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { caller } = auth;
 
@@ -64,7 +64,7 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const auth = await requireCompanionMode();
+  const auth = await requireAuth();
   if (!auth.ok) return auth.response;
   const { caller } = auth;
 

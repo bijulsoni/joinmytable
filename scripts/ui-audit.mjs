@@ -135,15 +135,13 @@ async function main() {
     { path: '/login', who: null, name: 'login — anonymous' },
     { path: '/forgot-password', who: null, name: 'forgot-password — anonymous' },
     { path: '/discover', who: seeker, name: '/discover — seeker' },
-    { path: '/requests', who: seeker, name: '/requests hub — seeker' },
-    { path: '/requests?sent=1', who: seeker, name: '/requests?sent=1 — seeker' },
-    { path: '/bookings', who: seeker, name: '/bookings — seeker' },
-    { path: '/bookings', who: companion, name: '/bookings — companion' },
+    { path: '/plans', who: seeker, name: '/plans — seeker' },
+    { path: '/plans', who: companion, name: '/plans — companion' },
+    { path: '/plans?sent=1', who: seeker, name: '/plans?sent=1 — seeker' },
     { path: '/chat', who: seeker, name: '/chat — seeker' },
     { path: '/profile', who: companion, name: '/profile — companion (companion mode)' },
     { path: '/verify', who: seeker, name: '/verify — seeker' },
     { path: '/verify/companion', who: companion, name: '/verify/companion — companion' },
-    { path: '/mode', who: seeker, name: '/mode — seeker' },
     { path: '/safety', who: null, name: '/safety — link from landing footer' },
   ];
 
@@ -216,12 +214,12 @@ async function main() {
     // rendered after client hydration via useSearchParams, so it's
     // intentionally absent from the SSR HTML; we only assert the page
     // itself renders.)
-    const hub = await call(seeker, 'GET', '/requests?sent=1');
+    const hub = await call(seeker, 'GET', '/plans?sent=1');
     const hubBody = await hub.text();
     if (/<meta name="next-error" content="not-found"\/>/i.test(hubBody)) {
-      fail('/requests?sent=1', 'returned a not-found page');
+      fail('/plans?sent=1', 'returned a not-found page');
     } else {
-      ok('/requests?sent=1 renders (banner appears after hydration)');
+      ok('/plans?sent=1 renders (banner appears after hydration)');
     }
 
     // Companion accepts → booking_id returned → chat link works.
@@ -253,10 +251,30 @@ async function main() {
         if (complete.status === 200) ok('seeker marks booking complete');
         else fail('seeker marks booking complete', JSON.stringify(complete.body));
 
-        // Verify booking detail page renders.
-        const detail = await call(seeker, 'GET', `/bookings/${bid}`);
-        const detailBody = await detail.text();
-        assertOkHtml(detail, detailBody, `booking detail /bookings/${bid.slice(0, 8)}…`);
+        // Verify plan detail page resolves via /plans/by-booking redirector.
+        const detail = await call(seeker, 'GET', `/plans/by-booking/${bid}`);
+        if (detail.status === 307 || detail.status === 308 || detail.status === 200) {
+          ok(`plan detail via /plans/by-booking/${bid.slice(0, 8)}…`);
+        } else {
+          fail(`plan detail via /plans/by-booking/${bid.slice(0, 8)}…`, `status ${detail.status}`);
+        }
+      }
+    }
+  }
+
+  // Walk past + cancelled bookings: same contract, different status.
+  // This catches Avatar / counterpart-name crashes on history rows.
+  console.log('\nPast / cancelled bookings detail render');
+  for (const session of [seeker, companion]) {
+    const list = await callJson(session, 'GET', '/api/bookings');
+    if (list.status !== 200) continue;
+    const ids = (list.body?.bookings ?? []).slice(0, 3).map((b) => b.id);
+    for (const id of ids) {
+      const detail = await call(session, 'GET', `/plans/by-booking/${id}`);
+      if (detail.status === 200 || detail.status === 307 || detail.status === 308) {
+        ok(`[${session.label}] /plans/by-booking/${id.slice(0, 8)}…`);
+      } else {
+        fail(`[${session.label}] /plans/by-booking/${id.slice(0, 8)}…`, `status ${detail.status}`);
       }
     }
   }

@@ -1,12 +1,15 @@
 'use server';
 
-// Server action backing the sign-up form. Steps:
-//   1. Validate the payload (zod).
-//   2. Call Supabase Auth signUp (email + password).
-//   3. Insert the public.users mirror row with the chosen modes.
-//   4. If a session was returned (email confirmation disabled), redirect
-//      to the verification screen so the seeker/companion can finish
-//      setup; otherwise route to a "check your inbox" notice.
+// Server action backing the sign-up form.
+//
+// The seeker/companion mode toggle was removed — every user is now a
+// seeker by default (they can send requests) and becomes discoverable
+// as a companion by setting up a verified companion profile from
+// /profile after sign-up. The legacy is_seeker/is_companion columns
+// still exist on `users` (DB CHECK constraint requires at least one);
+// we default both to true so seeded data stays consistent and so a
+// freshly signed-up user can immediately start a companion profile if
+// they want without flipping flags first.
 
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -16,24 +19,17 @@ import { logger } from '@/lib/logger';
 
 const log = logger.child({ module: 'auth.sign-up' });
 
-const SignUpSchema = z
-  .object({
-    email: z.string().email('Enter a valid email address.'),
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters.')
-      .max(72, 'Password is too long.'),
-    name: z.string().min(1, 'Name is required.').max(80, 'Name is too long.'),
-    isSeeker: z.boolean(),
-    isCompanion: z.boolean(),
-    acceptGuidelines: z
-      .boolean()
-      .refine((v) => v === true, 'You must accept the community guidelines.'),
-  })
-  .refine((v) => v.isSeeker || v.isCompanion, {
-    path: ['isSeeker'],
-    message: 'Pick at least one mode.',
-  });
+const SignUpSchema = z.object({
+  email: z.string().email('Enter a valid email address.'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters.')
+    .max(72, 'Password is too long.'),
+  name: z.string().min(1, 'Name is required.').max(80, 'Name is too long.'),
+  acceptGuidelines: z
+    .boolean()
+    .refine((v) => v === true, 'You must accept the community guidelines.'),
+});
 
 export type SignUpState = { status: 'idle' } | { status: 'error'; message: string };
 
@@ -44,8 +40,6 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
       .toLowerCase(),
     password: String(formData.get('password') ?? ''),
     name: String(formData.get('name') ?? '').trim(),
-    isSeeker: formData.get('isSeeker') === 'on',
-    isCompanion: formData.get('isCompanion') === 'on',
     acceptGuidelines: formData.get('acceptGuidelines') === 'on',
   });
 
@@ -73,12 +67,16 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
     };
   }
 
+  // Both flags default to true. The user is_seeker (everyone can send
+  // requests) — and is_companion is kept on so that companion-profile
+  // setup is one-step (no flag flip). Discoverability is gated on the
+  // companion_profiles row's verified_at, not on this flag.
   const mirror = await createUserMirrorRow({
     authUserId: authResult.user.id,
     email: parsed.data.email,
     name: parsed.data.name,
-    isSeeker: parsed.data.isSeeker,
-    isCompanion: parsed.data.isCompanion,
+    isSeeker: true,
+    isCompanion: true,
   });
   if (!mirror.ok) {
     log.error({ err: mirror.error }, 'mirror row insert failed');
@@ -86,7 +84,7 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
   }
 
   if (authResult.session) {
-    redirect('/verify');
+    redirect('/discover');
   }
   redirect('/check-email');
 }

@@ -76,7 +76,7 @@ function bookingStatusClass(status: BookingStatus): string {
   );
 }
 
-export function BookingsList() {
+export function PlansList() {
   const [tab, setTab] = useState<Tab>('upcoming');
   const [bookings, setBookings] = useState<BookingListItem[] | null>(null);
   const [inbound, setInbound] = useState<RequestListItem[]>([]);
@@ -179,38 +179,39 @@ export function BookingsList() {
     [outbound],
   );
 
-  const now = Date.now();
+  // A booking is "upcoming" while status is `confirmed` — completing or
+  // cancelling moves it to past. We deliberately don't drop confirmed
+  // bookings whose proposed time has slipped: many users pick a default
+  // time, it elapses, and the meeting is still on. The owner closes it
+  // explicitly via Mark complete / cancel.
   const upcomingBookings = useMemo(
-    () =>
-      (bookings ?? []).filter(
-        (b) =>
-          b.status === 'confirmed' && new Date(b.scheduled_time).getTime() > now - 2 * 3600 * 1000,
-      ),
-    [bookings, now],
+    () => (bookings ?? []).filter((b) => b.status === 'confirmed'),
+    [bookings],
   );
   const pastBookings = useMemo(
-    () =>
-      (bookings ?? []).filter(
-        (b) =>
-          b.status === 'completed' ||
-          b.status === 'cancelled' ||
-          (b.status === 'confirmed' &&
-            new Date(b.scheduled_time).getTime() <= now - 2 * 3600 * 1000),
-      ),
-    [bookings, now],
+    () => (bookings ?? []).filter((b) => b.status === 'completed' || b.status === 'cancelled'),
+    [bookings],
+  );
+  // Declined requests land in Past so there's a record of "I asked and
+  // they said no" instead of the row silently disappearing.
+  const declinedInbound = useMemo(() => inbound.filter((r) => r.status === 'declined'), [inbound]);
+  const declinedOutbound = useMemo(
+    () => outbound.filter((r) => r.status === 'declined'),
+    [outbound],
   );
 
   const upcomingEmpty =
     pendingInbound.length === 0 && pendingOutbound.length === 0 && upcomingBookings.length === 0;
-  const pastEmpty = pastBookings.length === 0;
+  const pastEmpty =
+    pastBookings.length === 0 && declinedInbound.length === 0 && declinedOutbound.length === 0;
 
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Bookings</h1>
+        <h1 className={styles.title}>Plans</h1>
       </header>
 
-      <div className={styles.tabs} role="tablist" aria-label="Booking timeline">
+      <div className={styles.tabs} role="tablist" aria-label="Plans timeline">
         {(['upcoming', 'past'] as const).map((t) => (
           <button
             key={t}
@@ -314,7 +315,7 @@ export function BookingsList() {
             {upcomingBookings.map((b) => {
               const meta = ACTIVITY_TYPE_META[b.activity_type];
               return (
-                <Card key={b.id} as={Link} href={`/chat/${b.id}`} shadow>
+                <Card key={b.id} as={Link} href={`/plans/by-booking/${b.id}`} shadow>
                   <div className={styles.row}>
                     <Avatar name={b.counterpart_name ?? 'Your companion'} size={56} />
                     <div className={styles.rowMain}>
@@ -359,9 +360,8 @@ export function BookingsList() {
           <>
             {pastBookings.map((b) => {
               const meta = ACTIVITY_TYPE_META[b.activity_type];
-              const href = b.status === 'completed' ? `/bookings/${b.id}` : `/bookings/${b.id}`;
               return (
-                <Card key={b.id} as={Link} href={href}>
+                <Card key={b.id} as={Link} href={`/plans/by-booking/${b.id}`}>
                   <div className={styles.row}>
                     <Avatar name={b.counterpart_name ?? 'A companion'} size={56} />
                     <div className={styles.rowMain}>
@@ -388,9 +388,46 @@ export function BookingsList() {
                 </Card>
               );
             })}
+
+            {[...declinedInbound, ...declinedOutbound].map((r) => {
+              const meta = ACTIVITY_TYPE_META[r.activity_type];
+              const heading =
+                r.companion_id === r.companion_id // always true; just to keep TS happy
+                  ? declinedOutbound.includes(r)
+                    ? `${r.counterpart_name ?? 'Your companion'} declined`
+                    : `You declined ${r.counterpart_name ?? 'a seeker'}`
+                  : '';
+              return (
+                <Card key={r.id} as={Link} href={`/plans/${r.id}`}>
+                  <div className={styles.row}>
+                    <Avatar name={r.counterpart_name ?? 'Someone'} size={56} />
+                    <div className={styles.rowMain}>
+                      <p className={styles.rowName}>{heading}</p>
+                      <p className={styles.rowMeta}>
+                        {meta.label} · {formatScheduled(r.proposed_time)}
+                        {r.venue_name ? ` · ${r.venue_name}` : ''}
+                      </p>
+                      <div style={{ marginTop: '0.375rem', display: 'flex', gap: '0.375rem' }}>
+                        <Badge activity={r.activity_type}>{meta.label}</Badge>
+                        <span className={`${styles.statusPill} ${styles.cancelled ?? ''}`}>
+                          Declined
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      aria-hidden
+                      style={{ color: 'var(--color-text-secondary)', fontSize: '1.25rem' }}
+                    >
+                      ›
+                    </span>
+                  </div>
+                </Card>
+              );
+            })}
+
             {pastEmpty ? (
-              <EmptyState title="No past bookings yet">
-                Completed and cancelled bookings show up here.
+              <EmptyState title="No past plans yet">
+                Completed, cancelled, and declined plans show up here.
               </EmptyState>
             ) : null}
           </>

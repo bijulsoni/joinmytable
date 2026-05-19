@@ -16,7 +16,7 @@ import 'server-only';
 // (request_received) for the companion — never-throws.
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { apiError, parseJsonBody, requireAuth, requireSeekerMode } from '@/app/api/_lib';
+import { apiError, parseJsonBody, requireAuth } from '@/app/api/_lib';
 import { ACTIVITY_TYPES, type ActivityType } from '@/lib/types';
 import { notify } from '@/lib/notifications';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
@@ -46,7 +46,7 @@ function toDto(
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireSeekerMode();
+  const guard = await requireAuth();
   if (!guard.ok) return guard.response;
   const { caller } = guard;
 

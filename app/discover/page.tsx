@@ -41,8 +41,10 @@ function pickRates(raw: Record<string, number> | null): Partial<Record<ActivityT
 
 export default async function DiscoverPage() {
   // AppShell handles the auth redirect, but we still need the session here
-  // for the data fetch (server Supabase client is request-scoped).
-  await requireSessionUser('/login?next=/discover');
+  // for the data fetch (server Supabase client is request-scoped). We
+  // also need the caller's user_id to filter their own profile out of the
+  // feed — a companion logged in shouldn't see themselves in /discover.
+  const session = await requireSessionUser('/login?next=/discover');
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
@@ -51,6 +53,7 @@ export default async function DiscoverPage() {
       'id, user_id, bio, service_area, activities, rates, photo_urls, rating_avg, verified_at, users:users!inner(name)',
     )
     .not('verified_at', 'is', null)
+    .neq('user_id', session.id)
     .order('rating_avg', { ascending: false, nullsFirst: false })
     .limit(60);
 

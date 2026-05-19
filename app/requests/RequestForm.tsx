@@ -67,12 +67,34 @@ function formatFieldErrors(details: Details | undefined): string | null {
   return parts.length ? parts.join(' · ') : null;
 }
 
-function todayLocal(): string {
-  const d = new Date();
+function toDateString(d: Date): string {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function todayLocal(): string {
+  return toDateString(new Date());
+}
+
+// Returns the next sensible default date+time for an activity. Snaps to
+// tomorrow if today's default-of-the-day (12:30 lunch, etc.) has already
+// passed. Always returns a moment at least 1h in the future.
+function nextSensibleDefault(timeStr: string): { date: string; time: string } {
+  const now = new Date();
+  const parts = timeStr.split(':').map((s) => Number(s));
+  const h = parts[0] ?? 12;
+  const m = parts[1] ?? 0;
+  const today = new Date(now);
+  today.setHours(h, m, 0, 0);
+  // If the default time today is already past or within the next hour,
+  // bump to tomorrow.
+  const targetDate =
+    today.getTime() < now.getTime() + 60 * 60 * 1000
+      ? new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      : now;
+  return { date: toDateString(targetDate), time: timeStr };
 }
 
 function combineDateTime(date: string, time: string): string | null {
@@ -83,6 +105,14 @@ function combineDateTime(date: string, time: string): string | null {
   const composed = new Date(`${date}T${time}`);
   if (Number.isNaN(composed.getTime())) return null;
   return composed.toISOString();
+}
+
+function isFutureDateTime(date: string, time: string): boolean {
+  const composed = new Date(`${date}T${time}`);
+  if (Number.isNaN(composed.getTime())) return false;
+  // Require at least one minute in the future so the API never sees a
+  // moment in the past by the time the request lands.
+  return composed.getTime() > Date.now() + 60 * 1000;
 }
 
 export function RequestForm() {
@@ -98,8 +128,9 @@ export function RequestForm() {
   const [activity, setActivity] = useState<ActivityType | null>(
     isActivityType(initialActivity) ? initialActivity : null,
   );
-  const [date, setDate] = useState(todayLocal());
-  const [time, setTime] = useState('12:30');
+  const initialDefault = nextSensibleDefault('12:30');
+  const [date, setDate] = useState(initialDefault.date);
+  const [time, setTime] = useState(initialDefault.time);
   const [venueName, setVenueName] = useState('');
   const [venueLocation, setVenueLocation] = useState('');
   const [budget, setBudget] = useState<BudgetTier>('$$');
@@ -177,6 +208,10 @@ export function RequestForm() {
       const proposedTime = combineDateTime(date, time);
       if (!proposedTime) {
         setSubmitError('Pick a valid date and time.');
+        return;
+      }
+      if (!isFutureDateTime(date, time)) {
+        setSubmitError('Pick a date and time in the future.');
         return;
       }
       if (!venueName.trim()) {

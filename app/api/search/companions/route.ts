@@ -128,6 +128,12 @@ export async function GET(request: NextRequest) {
     return apiError('internal_error', `Search failed: ${error.message}`);
   }
 
-  const companions = ((data ?? []) as RpcRow[]).map(toDto);
+  // Exclude the caller from their own discovery feed — both a seeker
+  // browsing for companions and a dual-mode user should never see
+  // themselves listed.
+  const callerId = guard.caller.userId;
+  const companions = ((data ?? []) as RpcRow[])
+    .filter((row) => row.user_id !== callerId)
+    .map(toDto);
   return NextResponse.json({ companions });
 }

@@ -17,15 +17,140 @@ import 'server-only';
 // Notification: fires request_accepted / request_declined to the seeker.
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { apiAdminClient, apiError, parseJsonBody, requireCompanionMode } from '@/app/api/_lib';
+import { apiAdminClient, apiError, parseJsonBody, requireAuth } from '@/app/api/_lib';
 import { uuidSchema } from '@/app/api/_lib/validators';
 import { notify } from '@/lib/notifications';
 import { updateRequestSchema } from '../_lib/validators';
 import type { MealRequestRow } from '../_lib/types';
-import type { ActivityType, BudgetTier } from '@/lib/types';
+import { ACTIVITY_TYPES, type ActivityType, type BudgetTier } from '@/lib/types';
+
+// GET /api/requests/[id]
+//
+// Returns the full request + counterpart profile + caller_role + (if
+// accepted) booking_id. Used by the /requests/[id] detail page.
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const guard = await requireAuth();
+  if (!guard.ok) return guard.response;
+  const { caller } = guard;
+
+  const { id: rawId } = await ctx.params;
+  const idResult = uuidSchema.safeParse(rawId);
+  if (!idResult.success) return apiError('invalid_input', 'Invalid request id.');
+  const id = idResult.data;
+
+  // RLS filters to (seeker_id = me OR companion_id = me).
+  const { data: reqRaw, error: reqErr } = await caller.supabase
+    .from('meal_requests')
+    .select(
+      `*,
+       seeker:users!meal_requests_seeker_id_fkey(id, name, email),
+       companion:users!meal_requests_companion_id_fkey(id, name, email),
+       bookings!bookings_request_id_fkey(id)`,
+    )
+    .eq('id', id)
+    .maybeSingle();
+  if (reqErr) return apiError('internal_error', `Could not load request: ${reqErr.message}`);
+  if (!reqRaw) return apiError('not_found', 'Request not found.');
+
+  const row = reqRaw as unknown as MealRequestRow & {
+    seeker: { id: string; name: string | null; email: string | null } | null;
+    companion: { id: string; name: string | null; email: string | null } | null;
+    bookings: Array<{ id: string }> | { id: string } | null;
+  };
+
+  const callerRole: 'seeker' | 'companion' =
+    row.seeker_id === caller.userId ? 'seeker' : 'companion';
+  const counterpartUser = callerRole === 'seeker' ? row.companion : row.seeker;
+  const counterpartId = counterpartUser?.id ?? null;
+  const counterpartName = counterpartUser?.name ?? null;
+  const bookingId = Array.isArray(row.bookings)
+    ? (row.bookings[0]?.id ?? null)
+    : (row.bookings?.id ?? null);
+
+  // Fetch the counterpart's companion profile if they have one — gives
+  // us bio, photo, rating, service area for the detail page.
+  let counterpartProfile: {
+    photo_url: string | null;
+    bio: string | null;
+    service_area: string | null;
+    rating_avg: number | null;
+    verified: boolean;
+    activities: ActivityType[];
+    rates: Partial<Record<ActivityType, number>>;
+  } | null = null;
+
+  if (counterpartId) {
+    // Admin so we can see profiles even before the counterpart is
+    // verified (rarely matters since the seeker only requests verified
+    // companions, but the seeker may be unverified themselves).
+    const admin = apiAdminClient();
+    const { data: cpRaw } = await admin
+      .from('companion_profiles')
+      .select('bio, service_area, photo_urls, rating_avg, verified_at, activities, rates')
+      .eq('user_id', counterpartId)
+      .maybeSingle();
+    if (cpRaw) {
+      const cp = cpRaw as {
+        bio: string | null;
+        service_area: string | null;
+        photo_urls: string[] | null;
+        rating_avg: number | string | null;
+        verified_at: string | null;
+        activities: Record<string, boolean> | null;
+        rates: Record<string, number> | null;
+      };
+      const activities = ACTIVITY_TYPES.filter((a) => cp.activities?.[a] === true);
+      const rates: Partial<Record<ActivityType, number>> = {};
+      for (const a of ACTIVITY_TYPES) {
+        const r = cp.rates?.[a];
+        if (typeof r === 'number' && r > 0) rates[a] = r;
+      }
+      counterpartProfile = {
+        photo_url: cp.photo_urls?.[0] ?? null,
+        bio: cp.bio,
+        service_area: cp.service_area,
+        rating_avg: cp.rating_avg === null ? null : Number(cp.rating_avg),
+        verified: cp.verified_at !== null,
+        activities,
+        rates,
+      };
+    }
+  }
+
+  return NextResponse.json({
+    request: {
+      id: row.id,
+      seeker_id: row.seeker_id,
+      companion_id: row.companion_id,
+      activity_type: row.activity_type,
+      proposed_time: row.proposed_time,
+      venue_name: row.venue_name,
+      venue_location: row.venue_location,
+      budget_tier: row.budget_tier,
+      message: row.message,
+      status: row.status,
+      created_at: row.created_at,
+    },
+    counterpart: {
+      user_id: counterpartId,
+      name: counterpartName,
+      ...(counterpartProfile ?? {
+        photo_url: null,
+        bio: null,
+        service_area: null,
+        rating_avg: null,
+        verified: false,
+        activities: [],
+        rates: {},
+      }),
+    },
+    caller_role: callerRole,
+    booking_id: bookingId,
+  });
+}
 
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireCompanionMode();
+  const guard = await requireAuth();
   if (!guard.ok) return guard.response;
   const { caller } = guard;
 
@@ -110,9 +235,12 @@ async function autoCreateBookingFromAccept(
   req: MealRequestRow,
   companionName: string | null,
 ): Promise<string | null> {
-  // Defensive: if venue/budget are missing, skip auto-booking. The
-  // seeker can still POST /api/bookings explicitly.
-  if (!req.venue_name || !req.venue_location || !req.budget_tier) return null;
+  // venue_name + budget are required by the request validator. Drop
+  // out only if those are missing. venue_location is optional in the
+  // request schema but NOT NULL on the bookings table — fall back to
+  // venue_name so the insert always succeeds.
+  if (!req.venue_name || !req.budget_tier) return null;
+  const venueLocation = req.venue_location?.trim() || req.venue_name;
 
   const admin = apiAdminClient();
 
@@ -145,7 +273,7 @@ async function autoCreateBookingFromAccept(
       request_id: req.id,
       activity_type: req.activity_type,
       venue_name: req.venue_name,
-      venue_location: req.venue_location,
+      venue_location: venueLocation,
       scheduled_time: req.proposed_time,
       budget_tier: req.budget_tier as BudgetTier,
       companion_fee: fee,

@@ -5,11 +5,20 @@ import 'server-only';
 // Route-handler version of `lib/auth/session.ts` helpers that return a
 // JSON 401/409 response instead of redirecting. Every gate re-reads the
 // session from the Supabase cookie and re-queries `public.users` for
-// role + verification state (server-side authority).
+// the mirrored row.
 //
 // `requireAuth` enforces "signed-in user with a mirrored users row".
-// `requireCompanionMode` / `requireSeekerMode` additionally enforce core
-// product rule #6 (one account, two modes) at the API boundary.
+// `requireVerifiedCompanion` additionally enforces "the caller has a
+// verified companion_profiles row" — used to gate endpoints that only
+// make sense for a companion who is actually discoverable.
+//
+// Historical note: this module previously exposed `requireSeekerMode`
+// and `requireCompanionMode` checks against `users.is_seeker` /
+// `users.is_companion` flags. Those mode flags were removed when we
+// merged the seeker/companion split into a single role-less UI; any
+// gate that needed "is the caller someone who can be paid for an
+// activity?" now means "has the caller set up + verified a companion
+// profile?" — derived, not flag-driven.
 
 import type { NextResponse } from 'next/server';
 import { apiError } from './errors';
@@ -64,28 +73,38 @@ export async function requireAuth(): Promise<AuthResult> {
   };
 }
 
-export async function requireCompanionMode(): Promise<AuthResult> {
+/**
+ * Require the caller to have a verified companion_profiles row.
+ * Replaces the old `requireCompanionMode` flag-based gate. Used by
+ * endpoints that only make sense for a companion who is actually
+ * discoverable (accepting requests, etc.).
+ *
+ * The Setup-your-companion-profile endpoints do NOT use this gate —
+ * they're how a user becomes a companion in the first place. They use
+ * `requireAuth` + RLS instead.
+ */
+export async function requireVerifiedCompanion(): Promise<AuthResult> {
   const result = await requireAuth();
   if (!result.ok) return result;
-  if (!result.caller.profile.is_companion) {
+  const { data, error } = await result.caller.supabase
+    .from('companion_profiles')
+    .select('verified_at')
+    .eq('user_id', result.caller.userId)
+    .maybeSingle();
+  if (error) {
+    return {
+      ok: false,
+      response: apiError('internal_error', 'Could not check companion status.'),
+    };
+  }
+  const row = data as { verified_at: string | null } | null;
+  if (!row || !row.verified_at) {
     return {
       ok: false,
       response: apiError(
         'companion_mode_required',
-        'Enable companion mode to manage your companion profile.',
+        'Set up + verify your companion profile to take this action.',
       ),
-    };
-  }
-  return result;
-}
-
-export async function requireSeekerMode(): Promise<AuthResult> {
-  const result = await requireAuth();
-  if (!result.ok) return result;
-  if (!result.caller.profile.is_seeker) {
-    return {
-      ok: false,
-      response: apiError('seeker_mode_required', 'Enable seeker mode to continue.'),
     };
   }
   return result;

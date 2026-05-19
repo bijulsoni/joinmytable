@@ -6,8 +6,7 @@ export { parseJsonBody } from './parse';
 export { apiServerClient, apiAdminClient, type LooseSupabaseClient } from './supabase';
 export {
   requireAuth,
-  requireCompanionMode,
-  requireSeekerMode,
+  requireVerifiedCompanion,
   type AuthedCaller,
   type AuthResult,
 } from './auth-guard';

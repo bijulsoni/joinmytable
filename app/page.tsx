@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { ActivityIcon } from '@/components/activity';
 import { getSessionUser } from '@/lib/auth/session';
+import { homePathForUser } from '@/lib/auth/home-path';
 import { ACTIVITY_TYPE_META, type ActivityType } from '@/lib/types';
 import { RotatingActivity } from './RotatingActivity';
 import styles from './page.module.css';
@@ -24,7 +25,7 @@ const ACTIVITY_COPY: Record<ActivityType, string> = {
 export default async function HomePage() {
   const user = await getSessionUser();
   if (user) {
-    redirect('/discover');
+    redirect(homePathForUser(user.profile));
   }
 
   return (

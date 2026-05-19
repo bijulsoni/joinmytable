@@ -120,34 +120,58 @@ export function ChatThread({ bookingId }: { bookingId: string }) {
 
   // Realtime subscription. We skip wiring it up while the endpoint
   // returns 404 — there are no messages to listen for in that state.
+  //
+  // IMPORTANT: realtime's postgres_changes events are RLS-filtered at the
+  // broker, so the websocket MUST authenticate with the user's JWT —
+  // otherwise it falls back to `anon` and our messages_select_participant
+  // policy hides every event. We hydrate the session from the cookie
+  // first, push the access_token into realtime.setAuth(), AND keep it
+  // refreshed on token rotation. Without this, sent messages only show
+  // up on the sender's side until the page reloads.
   useEffect(() => {
     if (endpointMissing) return;
     let mounted = true;
+    let channel: ReturnType<ReturnType<typeof createSupabaseBrowserClient>['channel']> | null =
+      null;
     const supabase = createSupabaseBrowserClient();
-    const channel = supabase
-      .channel(`messages:${bookingId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `booking_id=eq.${bookingId}`,
-        },
-        (payload: { new: ChatMessage }) => {
-          if (!mounted) return;
-          setMessages((prev) => {
-            // Avoid duplicating optimistic inserts.
-            if (prev.some((m) => m.id === payload.new.id)) return prev;
-            return [...prev, payload.new];
-          });
-        },
-      )
-      .subscribe();
+    let authSub: { data: { subscription: { unsubscribe: () => void } } } | null = null;
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (token) supabase.realtime.setAuth(token);
+
+      // Keep the realtime auth fresh across token rotations.
+      authSub = supabase.auth.onAuthStateChange((_evt, session) => {
+        if (session?.access_token) supabase.realtime.setAuth(session.access_token);
+      });
+
+      if (!mounted) return;
+      channel = supabase
+        .channel(`messages:${bookingId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `booking_id=eq.${bookingId}`,
+          },
+          (payload: { new: ChatMessage }) => {
+            if (!mounted) return;
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+          },
+        )
+        .subscribe();
+    })();
 
     return () => {
       mounted = false;
-      void supabase.removeChannel(channel);
+      if (channel) void supabase.removeChannel(channel);
+      authSub?.data.subscription.unsubscribe();
     };
   }, [bookingId, endpointMissing]);
 
@@ -286,7 +310,7 @@ export function ChatThread({ bookingId }: { bookingId: string }) {
           </div>
         ) : null}
 
-        {messages.map((m) => {
+        {messages.map((m, idx) => {
           if (m.is_system_message) {
             return (
               <p key={m.id} className={styles.system}>
@@ -295,21 +319,24 @@ export function ChatThread({ bookingId }: { bookingId: string }) {
             );
           }
           const isMine = booking ? m.sender_id === booking.caller_user_id : false;
+          // Only show the sender label when the author changes
+          // run-to-run; back-to-back messages from the same person
+          // suppress the label for a cleaner feed.
+          const prev = messages[idx - 1];
+          const showLabel = !prev || prev.is_system_message || prev.sender_id !== m.sender_id;
+          const senderLabel = isMine ? 'You' : (booking?.counterpart_name ?? '');
           return (
             <div
               key={m.id}
-              className={[styles.message, isMine ? styles.sent : styles.received]
-                .filter(Boolean)
-                .join(' ')}
+              className={`${styles.row} ${isMine ? styles.rowSent : styles.rowReceived}`}
             >
-              {m.body}
+              {showLabel ? <span className={styles.senderLabel}>{senderLabel}</span> : null}
               <div
-                className={[styles.timestamp, isMine ? styles.timestampRight : styles.timestampLeft]
-                  .filter(Boolean)
-                  .join(' ')}
+                className={`${styles.bubble} ${isMine ? styles.bubbleSent : styles.bubbleReceived}`}
               >
-                {formatTimestamp(m.sent_at)}
+                {m.body}
               </div>
+              <div className={styles.timestamp}>{formatTimestamp(m.sent_at)}</div>
             </div>
           );
         })}

@@ -67,6 +67,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       : (row.meal_requests.seeker?.name ?? null);
   const escrowStatus = row.payments?.[0]?.escrow_status ?? null;
 
+  const callerRole: 'seeker' | 'companion' = seekerId === caller.userId ? 'seeker' : 'companion';
+
   return NextResponse.json({
     booking: {
       id: row.id,
@@ -82,6 +84,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       seeker_id: seekerId,
       companion_id: companionId,
       counterpart_name: counterpartName,
+      caller_role: callerRole,
       escrow_status: escrowStatus,
     },
   });

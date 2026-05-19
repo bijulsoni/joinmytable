@@ -18,7 +18,7 @@ import 'server-only';
 //     parties.
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { apiError, parseJsonBody, requireAuth, requireSeekerMode } from '@/app/api/_lib';
+import { apiError, parseJsonBody, requireAuth } from '@/app/api/_lib';
 import { notify } from '@/lib/notifications';
 import { apiAdminClient } from '@/app/api/_lib';
 import type { MealRequestRow } from '../requests/_lib/types';
@@ -62,7 +62,7 @@ function toDto(
 }
 
 export async function POST(request: NextRequest) {
-  const guard = await requireSeekerMode();
+  const guard = await requireAuth();
   if (!guard.ok) return guard.response;
   const { caller } = guard;
 

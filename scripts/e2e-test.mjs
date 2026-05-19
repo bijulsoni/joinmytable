@@ -474,16 +474,32 @@ async function main() {
   }
 
   {
-    // Companion tries to send a request (seeker-only) — should 409.
+    // After the role-merge: anyone signed in can send a request — the
+    // distinction between seeker and companion is gone at the API. The
+    // assertion now exercises the happy path from the companion side
+    // (proposed_time must be in the future per the new validator).
     const res = await call(companion, 'POST', '/api/requests', {
       companion_id: seeker.userId,
       activity_type: 'coffee',
-      proposed_time: new Date().toISOString(),
+      proposed_time: new Date(Date.now() + 4 * 24 * 3600 * 1000).toISOString(),
       venue_name: 'Wherever',
       venue_location: 'Wherever',
       budget_tier: '$',
     });
-    expectStatus(res, 409, 'companion cannot post a request (seeker-only)');
+    // Either succeeds (201) or fails because the target user isn't a
+    // verified discoverable companion: 403 (no verified profile) or 404
+    // (no companion profile at all). All are valid post-merge outcomes;
+    // we just assert it's not the old "seeker_mode_required" 409.
+    if (res.status === 201 || res.status === 403 || res.status === 404) {
+      pass(
+        `signed-in user can attempt a request regardless of mode — status ${res.status} is valid`,
+      );
+    } else {
+      fail(
+        'cross-role POST /api/requests',
+        `expected 201 / 403 / 404, got ${res.status}: ${JSON.stringify(res.body)}`,
+      );
+    }
   }
 
   // ---------- Negative path: cancellation ----------------------------

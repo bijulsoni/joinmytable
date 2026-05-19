@@ -3,6 +3,10 @@ import { redirect } from 'next/navigation';
 import { requireSessionUser } from '@/lib/auth/session';
 import { BottomNav, BottomNavSpacer } from '@/components/ui';
 import { UserMenu } from './UserMenu';
+import { ChatNotifications } from './ChatNotifications';
+import { RequestNotifications } from './RequestNotifications';
+import { ChatDockProvider } from '@/lib/chat/dock-context';
+import { ChatDock } from '@/components/chat/ChatDock';
 import styles from './AppShell.module.css';
 
 // Shared app shell for every signed-in route.
@@ -47,32 +51,37 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
   const initials = initialsOf(user.profile?.name ?? null, user.email);
 
   return (
-    <div className={styles.appShell}>
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <Link href="/discover" className={styles.wordmark}>
-            <span className={styles.wordmarkMark}>◖</span>
-            JoinMyTable
-          </Link>
-          <nav className={styles.nav} aria-label="Primary">
-            <Link href="/discover" className={styles.navLink}>
-              Discover
+    <ChatDockProvider>
+      <div className={styles.appShell}>
+        <header className={styles.header}>
+          <div className={styles.headerInner}>
+            <Link href="/discover" className={styles.wordmark}>
+              <span className={styles.wordmarkMark}>◖</span>
+              JoinMyTable
             </Link>
-            <Link href="/bookings" className={styles.navLink}>
-              Bookings
-            </Link>
-            <Link href="/chat" className={styles.navLink}>
-              Messages
-            </Link>
-          </nav>
-          <div className={styles.right}>
-            <UserMenu name={name} email={user.email} initials={initials} />
+            <nav className={styles.nav} aria-label="Primary">
+              <Link href="/discover" className={styles.navLink}>
+                Discover
+              </Link>
+              <Link href="/plans" className={styles.navLink}>
+                Plans
+              </Link>
+              <Link href="/chat" className={styles.navLink}>
+                Messages
+              </Link>
+            </nav>
+            <div className={styles.right}>
+              <UserMenu name={name} email={user.email} initials={initials} />
+            </div>
           </div>
-        </div>
-      </header>
-      <main className={styles.main}>{children}</main>
-      <BottomNavSpacer />
-      <BottomNav />
-    </div>
+        </header>
+        <main className={styles.main}>{children}</main>
+        <BottomNavSpacer />
+        <BottomNav />
+        <ChatNotifications userId={user.id} />
+        <RequestNotifications userId={user.id} />
+        <ChatDock />
+      </div>
+    </ChatDockProvider>
   );
 }

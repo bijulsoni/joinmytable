@@ -1,0 +1,113 @@
+.dock {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(var(--bottom-nav-height, 64px) + 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 60;
+  pointer-events: none;
+  max-width: calc(100% - 2rem);
+}
+
+@media (min-width: 720px) {
+  .dock {
+    bottom: 1.25rem;
+  }
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 18rem;
+  max-width: 22rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  animation: slideUp 280ms var(--ease-out);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.toast:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toastBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-soft);
+  color: var(--color-ink);
+  font-size: 1rem;
+}
+
+.toastBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.toastName {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toastPreview {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.toastDismiss {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.toastDismiss:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text-primary);
+}

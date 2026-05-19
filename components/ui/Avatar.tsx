@@ -7,13 +7,13 @@ import styles from './Avatar.module.css';
 
 interface AvatarProps {
   src?: string | null;
-  name: string;
+  name?: string | null;
   size?: number;
   className?: string;
 }
 
-function initialsFromName(name: string): string {
-  const cleaned = name.trim();
+function initialsFromName(name: string | null | undefined): string {
+  const cleaned = (name ?? '').trim();
   if (!cleaned) return '?';
   const parts = cleaned.split(/\s+/).slice(0, 2);
   const letters = parts.map((part) => part.charAt(0)).join('');
@@ -33,7 +33,7 @@ export function Avatar({ src, name, size = 40, className }: AvatarProps) {
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={name} className={styles.image} loading="lazy" />
+        <img src={src} alt={name ?? ''} className={styles.image} loading="lazy" />
       ) : (
         <span className={styles.initials}>{initialsFromName(name)}</span>
       )}

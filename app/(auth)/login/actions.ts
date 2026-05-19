@@ -42,5 +42,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     };
   }
 
-  redirect('/');
+  // Mode-split is gone; everyone lands on /discover. They reach /plans
+  // / /chat / /profile through the AppShell nav once they're in.
+  redirect('/discover');
 }
