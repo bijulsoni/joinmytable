@@ -70,9 +70,21 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   const writable: CompanionProfileUpdate = {};
   if (input.bio !== undefined) writable.bio = input.bio;
   if (input.service_area !== undefined) writable.service_area = input.service_area;
-  if (input.location !== undefined) writable.location = input.location;
   if (input.activities !== undefined) writable.activities = input.activities;
   if (input.rates !== undefined) writable.rates = input.rates;
+  // PostGIS geography(Point, 4326) doesn't accept raw GeoJSON via PostgREST —
+  // it expects EWKT (`SRID=4326;POINT(lng lat)`). The validator accepts the
+  // friendlier GeoJSON shape on the wire and we convert here. Cast through
+  // unknown because the typed column shape is GeoJSONPoint, but the wire
+  // value into the DB is a string.
+  if (input.location !== undefined) {
+    if (input.location === null) {
+      (writable as Record<string, unknown>).location = null;
+    } else {
+      const [lng, lat] = input.location.coordinates;
+      (writable as Record<string, unknown>).location = `SRID=4326;POINT(${lng} ${lat})`;
+    }
+  }
 
   const renderUser: UserRow = caller.profile;
 
