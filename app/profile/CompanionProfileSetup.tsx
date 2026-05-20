@@ -33,10 +33,16 @@ async function readError(res: Response): Promise<string> {
   }
 }
 
+interface GeoJSONPoint {
+  type: 'Point';
+  coordinates: [number, number]; // [lng, lat]
+}
+
 interface ProfileDTO {
   id?: string;
   bio?: string | null;
   service_area?: string | null;
+  location?: GeoJSONPoint | null;
   activities?: Partial<Record<ActivityType, boolean>>;
   rates?: Partial<Record<ActivityType, number>>;
   photo_urls?: string[];
@@ -99,6 +105,13 @@ export function ProfileSetup() {
   const [profile, setProfile] = useState<ProfileDTO | null>(null);
   const [form, setForm] = useState<FormValues>(blankForm);
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  // `storedLocation` mirrors what the server already has. `pendingLocation`
+  // is a fresh capture awaiting save. When the user hits Save, pending
+  // (if set) gets PUT; otherwise stored stays untouched. Keeping the two
+  // separate means we can show "set 5 min ago" vs "you just re-captured"
+  // distinctly.
+  const [storedLocation, setStoredLocation] = useState<GeoJSONPoint | null>(null);
+  const [pendingLocation, setPendingLocation] = useState<GeoJSONPoint | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<
     | { status: 'idle' }
@@ -108,6 +121,9 @@ export function ProfileSetup() {
   >({ status: 'idle' });
   const [photoStatus, setPhotoStatus] = useState<
     { status: 'idle' } | { status: 'uploading' } | { status: 'error'; message: string }
+  >({ status: 'idle' });
+  const [locStatus, setLocStatus] = useState<
+    { status: 'idle' } | { status: 'capturing' } | { status: 'error'; message: string }
   >({ status: 'idle' });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,16 +136,23 @@ export function ProfileSetup() {
         setProfile({});
         setForm(blankForm());
         setPhotoUrls([]);
+        setStoredLocation(null);
         return;
       }
       if (!res.ok) {
         setLoadError(await readError(res));
         return;
       }
-      const data = (await res.json()) as ProfileDTO;
+      // GET /api/profiles/me returns { profile: ProfileDTO }, not the
+      // DTO at the top level. Old code unwrapped wrong and the form
+      // silently filled with defaults instead of the saved values.
+      const json = (await res.json()) as { profile: ProfileDTO };
+      const data = json.profile ?? {};
       setProfile(data);
       setForm(dtoToForm(data));
       setPhotoUrls(data.photo_urls ?? []);
+      setStoredLocation(data.location ?? null);
+      setPendingLocation(null);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Could not load profile.');
     }
@@ -168,6 +191,30 @@ export function ProfileSetup() {
         message: err instanceof Error ? err.message : 'Upload failed.',
       });
     }
+  }, []);
+
+  const onUseMyLocation = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocStatus({ status: 'error', message: 'Your browser does not support location.' });
+      return;
+    }
+    setLocStatus({ status: 'capturing' });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPendingLocation({
+          type: 'Point',
+          coordinates: [pos.coords.longitude, pos.coords.latitude],
+        });
+        setLocStatus({ status: 'idle' });
+      },
+      (err) => {
+        setLocStatus({
+          status: 'error',
+          message: err.message || 'Could not get your location. Check browser permissions.',
+        });
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60_000 },
+    );
   }, []);
 
   const onRemovePhoto = useCallback(async (url: string) => {
@@ -231,22 +278,32 @@ export function ProfileSetup() {
     }
 
     try {
+      // Only include `location` in the payload when the user just
+      // re-captured it — otherwise we'd round-trip the stored GeoJSON
+      // unchanged, which is harmless but noisy.
+      const payload: Record<string, unknown> = {
+        bio: form.bio.trim() || null,
+        service_area: form.service_area.trim() || null,
+        activities,
+        rates,
+      };
+      if (pendingLocation) {
+        payload.location = pendingLocation;
+      }
       const res = await fetch('/api/profiles/me', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          bio: form.bio.trim() || null,
-          service_area: form.service_area.trim() || null,
-          activities,
-          rates,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         setSaveStatus({ status: 'error', message: await readError(res) });
         return;
       }
-      const updated = (await res.json()) as ProfileDTO;
+      const updatedJson = (await res.json()) as { profile: ProfileDTO };
+      const updated = updatedJson.profile ?? {};
       setProfile(updated);
+      setStoredLocation(updated.location ?? null);
+      setPendingLocation(null);
       setSaveStatus({ status: 'ok' });
     } catch (err) {
       setSaveStatus({
@@ -304,6 +361,39 @@ export function ProfileSetup() {
         onChange={(e) => setForm({ ...form, service_area: e.target.value })}
         placeholder="e.g. San Francisco, CA"
       />
+      <div className={styles.locationRow}>
+        <button
+          type="button"
+          className={styles.secondary}
+          onClick={onUseMyLocation}
+          disabled={locStatus.status === 'capturing'}
+        >
+          📍{' '}
+          {locStatus.status === 'capturing'
+            ? 'Getting your location…'
+            : pendingLocation
+              ? 'Re-capture location'
+              : storedLocation
+                ? 'Update my current location'
+                : 'Use my current location'}
+        </button>
+        <span className={styles.locationStatus}>
+          {pendingLocation ? (
+            <span className={styles.locationStatusOk}>✓ New coords ready — hit Save to apply.</span>
+          ) : storedLocation ? (
+            <span className={styles.locationStatusOk}>
+              ✓ Location is set. Re-capture when you actually relocate.
+            </span>
+          ) : (
+            <span className={styles.locationStatusWarn}>
+              Not set yet. Without coords you won&apos;t appear in nearby search.
+            </span>
+          )}
+        </span>
+        {locStatus.status === 'error' ? (
+          <p className={styles.fieldError}>{locStatus.message}</p>
+        ) : null}
+      </div>
 
       <label className={styles.label}>Photos</label>
       <p className={styles.helpText}>Up to 8. The first one shows up as your hero on /discover.</p>
