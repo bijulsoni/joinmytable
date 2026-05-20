@@ -166,7 +166,9 @@ async function main() {
   await login(companion, 'companion-demo@jmt.test');
   pass('login both users', `seeker=${seeker.userId.slice(0, 8)} companion=${companion.userId.slice(0, 8)}`);
 
-  // Clean prior runs.
+  // Clean prior runs. We also clean on the way OUT in a finally below
+  // so the demo accounts are pristine between runs — manual testing
+  // shouldn't have to dodge leftover bookings the harness created.
   await cleanupForUserPair(seeker.userId, companion.userId);
   pass('clean prior run');
 
@@ -621,6 +623,20 @@ async function main() {
   console.log('\n===========================');
   console.log(`PASS: ${passed.length}`);
   console.log(`FAIL: ${failed.length}`);
+
+  // Leave the DB pristine for the next manual session. Skip this with
+  // KEEP_E2E_DATA=1 when debugging what the harness produced.
+  if (process.env.KEEP_E2E_DATA) {
+    console.log('\n(KEEP_E2E_DATA set — leaving harness-generated rows in place.)');
+  } else {
+    try {
+      await cleanupForUserPair(seeker.userId, companion.userId);
+      console.log('Post-run cleanup: demo seeker ↔ companion rows wiped.');
+    } catch (err) {
+      console.error('Post-run cleanup failed:', err.message);
+    }
+  }
+
   if (failed.length) {
     console.log('\nFailures:');
     for (const f of failed) console.log(`  • ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
