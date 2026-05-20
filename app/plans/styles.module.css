@@ -93,23 +93,26 @@
   width: 44px;
   height: 44px;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
+  background: #25d366;
+  border: 1px solid #1ebe5d;
+  color: #ffffff;
   font-size: 1.125rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 1px 2px rgba(37, 211, 102, 0.35);
   transition:
     background var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out);
 }
 
 .bookingChatButton:hover {
-  background: var(--color-surface);
-  border-color: var(--color-border-strong);
+  background: #1ebe5d;
+  border-color: #17a850;
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.45);
   transform: translateY(-1px);
 }
 
