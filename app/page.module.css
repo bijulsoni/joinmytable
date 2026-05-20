@@ -1,9 +1,13 @@
-/* Public landing page. Mobile-first; warm, social, inviting. */
+/* Public landing page. Mobile-first; warm, social, inviting.
+ * Vibrant/playful pass: soft gradient wash behind the hero, springy
+ * entrances on the CTA row, and a more energetic accent color rotation. */
 
 .shell {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  background: var(--gradient-hero) var(--color-background);
+  background-attachment: fixed;
 }
 
 .topbar {
@@ -38,11 +42,12 @@
   width: 1.5rem;
   height: 1.5rem;
   border-radius: var(--radius-pill);
-  background: var(--color-coffee);
+  background: var(--gradient-cta);
   color: var(--color-text-inverse);
   font-size: 0.875rem;
   line-height: 1;
   padding-bottom: 1px;
+  box-shadow: var(--shadow-cta);
 }
 
 .topbarLogin {
@@ -153,6 +158,8 @@
   flex-direction: column;
   gap: 0.625rem;
   margin-top: 0.5rem;
+  animation: fadeUp var(--duration-slow) var(--ease-spring) both;
+  animation-delay: 120ms;
 }
 
 .heroProof {

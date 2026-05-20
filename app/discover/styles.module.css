@@ -1,10 +1,14 @@
-/* Discover feed — photo-forward, browsable, no-required-action. */
+/* Discover feed — photo-forward, browsable, no-required-action.
+ * Vibrant pass: soft gradient hero wash, accent-colored accents on the
+ * eyebrow + heroTitleAccent, springier card lifts. */
 
 .feedShell {
   max-width: 68rem;
   margin: 0 auto;
   padding: 1.25rem 1.25rem 3rem;
   width: 100%;
+  background: var(--gradient-hero);
+  background-attachment: fixed;
 }
 
 /* -------- Hero ------------------------------------------------- */
@@ -61,7 +65,10 @@
 }
 
 .heroTitleAccent {
-  color: var(--color-coffee);
+  background: var(--gradient-cta);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   font-style: italic;
   font-variation-settings:
     'opsz' 96,
@@ -293,21 +300,21 @@
   flex-direction: column;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   text-decoration: none;
   color: inherit;
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
   transition:
-    transform var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-spring),
     box-shadow var(--duration-base) var(--ease-out),
     border-color var(--duration-base) var(--ease-out);
 }
 
 .card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px) scale(1.012);
   box-shadow: var(--shadow-lg);
-  border-color: var(--color-border-strong);
+  border-color: var(--color-accent-soft);
   color: inherit;
 }
 

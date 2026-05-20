@@ -39,7 +39,12 @@
   background: var(--gradient-cta);
   color: var(--color-text-inverse);
   border-color: transparent;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-cta);
+  transition:
+    transform var(--duration-base) var(--ease-spring),
+    background var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    filter var(--duration-fast) var(--ease-out);
 }
 
 .primary:hover:not(:disabled),
@@ -49,17 +54,18 @@
 }
 
 .primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  background: var(--gradient-cta-hover);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--shadow-cta-hover);
 }
 
 .primary:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.99);
   filter: brightness(0.95);
 }
 
 .primary:focus-visible {
-  box-shadow: var(--shadow-sm), var(--shadow-focus);
+  box-shadow: var(--shadow-cta), var(--shadow-focus);
 }
 
 .secondary {

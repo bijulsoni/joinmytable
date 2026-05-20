@@ -43,22 +43,45 @@
   --color-warning: #8c5b00;
   --color-warning-soft: #fbeed3;
 
-  /* Brand accent — deep teal "ink" that grounds the warm palette. */
+  /* Brand accent — warm coral that energises the cream palette. The
+     previous deep-teal "ink" is kept around as a neutral grounding for
+     headlines and surfaces that need to feel solid. */
   --color-ink: #1f4756;
   --color-ink-strong: #15323d;
   --color-ink-soft: #dfeaef;
-  --color-accent: var(--color-ink);
-  --color-accent-hover: var(--color-ink-strong);
-  --color-accent-soft: var(--color-ink-soft);
 
-  /* Gradients. */
+  /* Primary accent — coral/peach for buttons, links, focus rings. */
+  --color-accent: #ef5b3b;
+  --color-accent-hover: #d34624;
+  --color-accent-soft: #ffe2d4;
+  --color-accent-tint: #fff1ea;
+
+  /* Secondary accent — minty cool tone for status pills + counters. */
+  --color-mint: #2cb39b;
+  --color-mint-soft: #d4f0ea;
+
+  /* Highlight — bright sunshine yellow for "new", "fresh" badges. */
+  --color-sun: #f5b738;
+  --color-sun-soft: #fcecc6;
+
+  /* Gradients — softer washes + playful CTAs. */
   --gradient-warm: radial-gradient(
     1200px 600px at 50% -10%,
-    rgba(241, 198, 134, 0.45),
-    transparent 60%
+    rgba(255, 184, 122, 0.55),
+    transparent 65%
   );
-  --gradient-card: linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 1));
-  --gradient-cta: linear-gradient(180deg, #1f4756 0%, #15323d 100%);
+  --gradient-card: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 1));
+  /* CTA gradient: peach → coral. Replaces the old teal slab so primary
+     buttons feel alive. */
+  --gradient-cta: linear-gradient(135deg, #ffa172 0%, #ef5b3b 50%, #d34624 100%);
+  --gradient-cta-hover: linear-gradient(135deg, #ffb084 0%, #f56b4d 50%, #de5230 100%);
+  /* Hero wash: layered radial gradients used behind the landing + discover
+     hero blocks for the "soft warmth" feel without overpowering content. */
+  --gradient-hero:
+    radial-gradient(900px 500px at 8% -10%, rgba(255, 196, 153, 0.55), transparent 60%),
+    radial-gradient(700px 600px at 90% 110%, rgba(217, 240, 234, 0.6), transparent 60%);
+  /* Sunny pill — for happy little badges. */
+  --gradient-sun: linear-gradient(135deg, #ffd76e 0%, #f5b738 100%);
 
   /* Typography. */
   --font-display:
@@ -66,21 +89,24 @@
   --font-body:
     var(--font-body), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 
-  /* Radii. */
-  --radius-xs: 6px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
-  --radius-xl: 32px;
+  /* Radii — pushed bigger for that "everything's rounded" feel. */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+  --radius-xl: 36px;
   --radius-pill: 999px;
 
-  /* Elevation. */
-  --shadow-xs: 0 1px 2px rgba(34, 25, 15, 0.04);
-  --shadow-sm: 0 2px 6px rgba(34, 25, 15, 0.06);
-  --shadow-md: 0 8px 24px rgba(34, 25, 15, 0.08);
-  --shadow-lg: 0 20px 48px rgba(34, 25, 15, 0.12);
-  --shadow-xl: 0 32px 64px rgba(34, 25, 15, 0.18);
-  --shadow-focus: 0 0 0 4px var(--color-ink-soft);
+  /* Elevation — coral-tinted shadows so depth feels warm, not generic. */
+  --shadow-xs: 0 1px 2px rgba(60, 30, 15, 0.05);
+  --shadow-sm: 0 2px 8px rgba(60, 30, 15, 0.07);
+  --shadow-md: 0 12px 28px rgba(60, 30, 15, 0.1);
+  --shadow-lg: 0 24px 56px rgba(60, 30, 15, 0.14);
+  --shadow-xl: 0 36px 72px rgba(60, 30, 15, 0.2);
+  --shadow-focus: 0 0 0 4px var(--color-accent-soft);
+  /* A small colored glow for CTAs at rest. */
+  --shadow-cta: 0 6px 18px rgba(239, 91, 59, 0.32);
+  --shadow-cta-hover: 0 10px 26px rgba(239, 91, 59, 0.42);
 
   /* Spacing scale. */
   --space-1: 0.25rem;
@@ -93,12 +119,14 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
 
-  /* Motion. */
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
-  --duration-slow: 360ms;
+  /* Motion — adding a springy easing for the playful state changes. */
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 380ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Overshoots slightly — for tile selection, dock open, etc. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Layout. */
   --bp-tablet: 600px;
