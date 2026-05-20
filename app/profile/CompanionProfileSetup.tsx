@@ -200,11 +200,54 @@ export function ProfileSetup() {
     }
     setLocStatus({ status: 'capturing' });
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setPendingLocation({
-          type: 'Point',
-          coordinates: [pos.coords.longitude, pos.coords.latitude],
-        });
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setPendingLocation({ type: 'Point', coordinates: [lng, lat] });
+
+        // Reverse geocode via OpenStreetMap Nominatim (free, no key).
+        // We ask for neighbourhood-zoom detail and prefer the most
+        // specific bit (neighbourhood / suburb / city). Fails silently
+        // — the lat/lng capture is the source of truth; the text label
+        // is just convenience.
+        try {
+          const url = new URL('https://nominatim.openstreetmap.org/reverse');
+          url.searchParams.set('lat', String(lat));
+          url.searchParams.set('lon', String(lng));
+          url.searchParams.set('format', 'jsonv2');
+          url.searchParams.set('zoom', '14');
+          url.searchParams.set('addressdetails', '1');
+          const res = await fetch(url.toString(), {
+            headers: { Accept: 'application/json' },
+          });
+          if (res.ok) {
+            const json = (await res.json()) as {
+              address?: {
+                neighbourhood?: string;
+                suburb?: string;
+                quarter?: string;
+                city?: string;
+                town?: string;
+                village?: string;
+                state?: string;
+              };
+              display_name?: string;
+            };
+            const a = json.address ?? {};
+            const locality = a.neighbourhood ?? a.suburb ?? a.quarter ?? null;
+            const city = a.city ?? a.town ?? a.village ?? null;
+            const state = a.state ?? null;
+            const cityState = [city, state].filter(Boolean).join(', ');
+            const label =
+              locality && city ? `${locality}, ${cityState}` : cityState || json.display_name || '';
+            if (label) {
+              setForm((prev) => ({ ...prev, service_area: label }));
+            }
+          }
+        } catch {
+          // Network blip — the coords are still captured, user can type
+          // the area name themselves.
+        }
         setLocStatus({ status: 'idle' });
       },
       (err) => {
