@@ -93,6 +93,44 @@
   display: none;
 }
 
+/* Radius selector — same chip pattern as activities, with a leading label. */
+
+.radiusRail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.radiusLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-right: 0.25rem;
+}
+
+.locationNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--color-ink-soft);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 18%, transparent);
+  color: var(--color-ink-strong);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  margin-bottom: 0.875rem;
+}
+
+.cardDistance {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
 .chip {
   appearance: none;
   display: inline-flex;

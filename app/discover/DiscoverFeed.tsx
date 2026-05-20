@@ -1,16 +1,22 @@
 'use client';
 
-// Feed-first discovery surface.
+// Discover feed.
 //
-//   - Server pre-fetches all verified companions and passes them as a
-//     prop. The default view is read-only: photos, names, ratings,
-//     activity tags. No location prompt, no required search.
+// SSR seeds the list with an unfiltered set of verified companions so
+// the page paints fast and so harnesses (which don't run JS) see real
+// cards. On mount the client asks for geolocation; if granted it
+// re-fetches /api/search/companions?lat=&lng=&radius_km= and replaces
+// the list with proximity-filtered, distance-sorted results.
 //
-//   - Filters (activity + service-area keyword) are collapsed by default.
-//     Expanding "Refine" lets the user narrow the feed entirely
-//     client-side over the prefetched list.
+// If geolocation is denied or unavailable, we keep the server seed and
+// show a "browsing everywhere" notice so the seeker knows why an LA
+// companion is showing up when they live in Seattle.
+//
+// Radius (in miles, US-centric) is user-controlled — pill selector with
+// 5 / 10 / 25 / 50 / 100 mi options. Default 50. Persisted in
+// localStorage so future visits remember the pick.
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui';
 import { ActivityIcon } from '@/components/activity';
@@ -27,11 +33,31 @@ export interface FeedCompanion {
   activities: ActivityType[];
   rates: Partial<Record<ActivityType, number>>;
   verified: boolean;
+  /** Distance from the seeker's current location, when known. */
+  distance_km?: number | null;
 }
 
 interface Props {
   companions: FeedCompanion[];
   fetchError: string | null;
+}
+
+const RADIUS_OPTIONS_MI = [5, 10, 25, 50, 100] as const;
+type RadiusMi = (typeof RADIUS_OPTIONS_MI)[number];
+const DEFAULT_RADIUS_MI: RadiusMi = 50;
+const RADIUS_STORAGE_KEY = 'jmt-discover-radius-mi';
+const MI_TO_KM = 1.609344;
+
+function readStoredRadius(): RadiusMi {
+  if (typeof window === 'undefined') return DEFAULT_RADIUS_MI;
+  try {
+    const raw = window.localStorage.getItem(RADIUS_STORAGE_KEY);
+    const n = raw ? Number(raw) : NaN;
+    if ((RADIUS_OPTIONS_MI as readonly number[]).includes(n)) return n as RadiusMi;
+  } catch {
+    // ignored: privacy mode etc.
+  }
+  return DEFAULT_RADIUS_MI;
 }
 
 function initials(name: string): string {
@@ -40,9 +66,106 @@ function initials(name: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
-export function DiscoverFeed({ companions, fetchError }: Props) {
+function formatDistance(km: number | null | undefined): string | null {
+  if (km === null || km === undefined) return null;
+  const mi = km / MI_TO_KM;
+  if (mi < 0.5) return 'Less than ½ mi away';
+  if (mi < 10) return `${mi.toFixed(1)} mi away`;
+  return `${Math.round(mi)} mi away`;
+}
+
+type LocationState =
+  | { status: 'idle' }
+  | { status: 'requesting' }
+  | { status: 'granted'; lat: number; lng: number }
+  | { status: 'denied'; reason: string }
+  | { status: 'unsupported' };
+
+export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError }: Props) {
+  const [companions, setCompanions] = useState<FeedCompanion[]>(seedCompanions);
+  const [fetchError, setFetchError] = useState<string | null>(seedError);
+  const [location, setLocation] = useState<LocationState>({ status: 'idle' });
+  const [radiusMi, setRadiusMi] = useState<RadiusMi>(DEFAULT_RADIUS_MI);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Client-side filters layered on top of the geo-filtered server set.
   const [activityFilter, setActivityFilter] = useState<ActivityType | null>(null);
   const [areaQuery, setAreaQuery] = useState('');
+
+  // Track whether we've already done the post-mount fetch so radius
+  // changes don't fire twice on first paint.
+  const initialFetchDone = useRef(false);
+
+  // Hydrate the stored radius preference + kick off geolocation. We do
+  // this in a single effect so the initial fetch picks up the stored
+  // radius rather than the default-then-overwrite race.
+  useEffect(() => {
+    setRadiusMi(readStoredRadius());
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocation({ status: 'unsupported' });
+      return;
+    }
+    setLocation({ status: 'requesting' });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({
+          status: 'granted',
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        setLocation({ status: 'denied', reason: err.message || 'Location unavailable.' });
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60_000 },
+    );
+  }, []);
+
+  // Whenever we have a location + radius, fetch the filtered list.
+  const fetchFiltered = useCallback(async (lat: number, lng: number, radiusKm: number) => {
+    setRefreshing(true);
+    setFetchError(null);
+    try {
+      const params = new URLSearchParams({
+        lat: String(lat),
+        lng: String(lng),
+        radius_km: String(radiusKm),
+        limit: '60',
+      });
+      const res = await fetch(`/api/search/companions?${params.toString()}`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: { message?: string };
+        };
+        throw new Error(body.error?.message ?? `Search failed (${res.status}).`);
+      }
+      const body = (await res.json()) as { companions: FeedCompanion[] };
+      setCompanions(body.companions ?? []);
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'Could not refresh nearby companions.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (location.status !== 'granted') return;
+    initialFetchDone.current = true;
+    void fetchFiltered(location.lat, location.lng, radiusMi * MI_TO_KM);
+  }, [location, radiusMi, fetchFiltered]);
+
+  const handleRadiusChange = useCallback((next: RadiusMi) => {
+    setRadiusMi(next);
+    try {
+      window.localStorage.setItem(RADIUS_STORAGE_KEY, String(next));
+    } catch {
+      // localStorage may be unavailable (privacy mode).
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     return companions.filter((c) => {
@@ -64,7 +187,11 @@ export function DiscoverFeed({ companions, fetchError }: Props) {
       <header className={styles.feedHero}>
         <div className={styles.heroEyebrow}>
           <span className={styles.heroEyebrowDot} />
-          {total} verified companion{total === 1 ? '' : 's'} ready to share a table
+          {location.status === 'requesting'
+            ? 'Finding companions near you…'
+            : location.status === 'granted'
+              ? `${total} companion${total === 1 ? '' : 's'} within ${radiusMi} mi`
+              : `${total} verified companion${total === 1 ? '' : 's'} ready to share a table`}
         </div>
         <h1 className={styles.heroTitle}>
           Find your <span className={styles.heroTitleAccent}>table&nbsp;mate</span>.
@@ -74,6 +201,36 @@ export function DiscoverFeed({ companions, fetchError }: Props) {
           send a request.
         </p>
       </header>
+
+      {location.status === 'denied' || location.status === 'unsupported' ? (
+        <div className={styles.locationNotice} role="status">
+          <span aria-hidden>📍</span>
+          <span>
+            Showing companions <strong>everywhere</strong>.{' '}
+            {location.status === 'denied'
+              ? 'Allow location in your browser to see only people near you.'
+              : 'Your browser doesn’t support location.'}
+          </span>
+        </div>
+      ) : null}
+
+      {location.status === 'granted' ? (
+        <section className={styles.radiusRail} aria-label="Search radius">
+          <span className={styles.radiusLabel}>Within</span>
+          {RADIUS_OPTIONS_MI.map((mi) => (
+            <button
+              key={mi}
+              type="button"
+              className={`${styles.chip} ${radiusMi === mi ? styles.chipActive : ''}`}
+              aria-pressed={radiusMi === mi}
+              onClick={() => handleRadiusChange(mi)}
+              disabled={refreshing}
+            >
+              {mi} mi
+            </button>
+          ))}
+        </section>
+      ) : null}
 
       <label className={styles.areaSearch} htmlFor="discover-area">
         <span className={styles.areaSearchIcon} aria-hidden>
@@ -135,14 +292,23 @@ export function DiscoverFeed({ companions, fetchError }: Props) {
           <div className={styles.emptyIcon} aria-hidden>
             ☕
           </div>
-          <h2 className={styles.emptyTitle}>No companions match these filters</h2>
-          <p className={styles.emptyText}>Try a different activity or clear the area filter.</p>
+          <h2 className={styles.emptyTitle}>
+            {location.status === 'granted'
+              ? `No companions within ${radiusMi} mi`
+              : 'No companions match these filters'}
+          </h2>
+          <p className={styles.emptyText}>
+            {location.status === 'granted'
+              ? 'Try widening the radius or clearing the activity filter.'
+              : 'Try a different activity or clear the area filter.'}
+          </p>
           <button
             type="button"
             className={styles.emptyResetButton}
             onClick={() => {
               setActivityFilter(null);
               setAreaQuery('');
+              if (location.status === 'granted') handleRadiusChange(100);
             }}
           >
             Reset filters
@@ -150,60 +316,66 @@ export function DiscoverFeed({ companions, fetchError }: Props) {
         </div>
       ) : (
         <ul className={styles.grid}>
-          {filtered.map((c) => (
-            <li key={c.user_id} className={styles.cardItem}>
-              <Link
-                href={`/companions/${c.user_id}`}
-                className={styles.card}
-                aria-label={`${c.name}'s profile`}
-              >
-                <div className={styles.cardPhoto}>
-                  {c.photo_url ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={c.photo_url} alt="" className={styles.cardImg} />
-                  ) : (
-                    <div
-                      className={styles.cardInitials}
-                      data-activity={c.activities[0] ?? 'lunch'}
-                      aria-hidden
-                    >
-                      {initials(c.name)}
-                    </div>
-                  )}
-                  {c.verified ? (
-                    <span className={styles.verifiedBadge} title="Verified">
-                      ✓ Verified
-                    </span>
-                  ) : null}
-                </div>
-                <div className={styles.cardBody}>
-                  <h3 className={styles.cardName}>{c.name}</h3>
-                  {c.service_area ? (
-                    <p className={styles.cardArea}>
-                      <span aria-hidden>📍</span> {c.service_area}
-                    </p>
-                  ) : null}
-                  {c.bio ? <p className={styles.cardBio}>{c.bio}</p> : null}
-                  <div className={styles.cardActivities}>
-                    {c.activities.map((a) => (
-                      <Badge key={a} activity={a}>
-                        {ACTIVITY_TYPE_META[a].label}
-                        {c.rates[a] !== undefined ? ` · $${c.rates[a]}` : ''}
-                      </Badge>
-                    ))}
-                  </div>
-                  {c.rating_avg !== null && c.rating_avg > 0 ? (
-                    <p className={styles.cardRating}>
-                      <span className={styles.starFilled} aria-hidden>
-                        ★
+          {filtered.map((c) => {
+            const distanceLabel = formatDistance(c.distance_km);
+            return (
+              <li key={c.user_id} className={styles.cardItem}>
+                <Link
+                  href={`/companions/${c.user_id}`}
+                  className={styles.card}
+                  aria-label={`${c.name}'s profile`}
+                >
+                  <div className={styles.cardPhoto}>
+                    {c.photo_url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={c.photo_url} alt="" className={styles.cardImg} />
+                    ) : (
+                      <div
+                        className={styles.cardInitials}
+                        data-activity={c.activities[0] ?? 'lunch'}
+                        aria-hidden
+                      >
+                        {initials(c.name)}
+                      </div>
+                    )}
+                    {c.verified ? (
+                      <span className={styles.verifiedBadge} title="Verified">
+                        ✓ Verified
                       </span>
-                      {c.rating_avg.toFixed(1)}
-                    </p>
-                  ) : null}
-                </div>
-              </Link>
-            </li>
-          ))}
+                    ) : null}
+                  </div>
+                  <div className={styles.cardBody}>
+                    <h3 className={styles.cardName}>{c.name}</h3>
+                    {c.service_area ? (
+                      <p className={styles.cardArea}>
+                        <span aria-hidden>📍</span> {c.service_area}
+                        {distanceLabel ? (
+                          <span className={styles.cardDistance}> · {distanceLabel}</span>
+                        ) : null}
+                      </p>
+                    ) : null}
+                    {c.bio ? <p className={styles.cardBio}>{c.bio}</p> : null}
+                    <div className={styles.cardActivities}>
+                      {c.activities.map((a) => (
+                        <Badge key={a} activity={a}>
+                          {ACTIVITY_TYPE_META[a].label}
+                          {c.rates[a] !== undefined ? ` · $${c.rates[a]}` : ''}
+                        </Badge>
+                      ))}
+                    </div>
+                    {c.rating_avg !== null && c.rating_avg > 0 ? (
+                      <p className={styles.cardRating}>
+                        <span className={styles.starFilled} aria-hidden>
+                          ★
+                        </span>
+                        {c.rating_avg.toFixed(1)}
+                      </p>
+                    ) : null}
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
