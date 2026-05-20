@@ -245,12 +245,12 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
               aria-valuetext={`${radiusMi} miles`}
               className={styles.radiusSliderInput}
             />
-            <div className={styles.radiusSliderTicks} aria-hidden>
+            <div className={styles.radiusSliderDots} aria-hidden>
               {RADIUS_OPTIONS_MI.map((mi) => (
                 <span
                   key={mi}
-                  className={`${styles.radiusSliderTick} ${
-                    mi === radiusMi ? styles.radiusSliderTickActive : ''
+                  className={`${styles.radiusSliderDot} ${
+                    mi === radiusMi ? styles.radiusSliderDotActive : ''
                   }`}
                 >
                   {mi}

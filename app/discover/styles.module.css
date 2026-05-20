@@ -142,16 +142,24 @@
 
 .radiusSliderTrack {
   position: relative;
-  height: 18px;
+  height: 32px;
+  /* Reserve the dot's radius on each side so the gradient track lines
+     up edge-to-edge with the centers of the first and last dots. */
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
 }
 
 .radiusSliderInput {
   appearance: none;
   -webkit-appearance: none;
+  position: absolute;
+  inset: 13px 0 0 0; /* center on the visual track */
   width: 100%;
   height: 6px;
   margin: 0;
   padding: 0;
+  z-index: 2; /* on top of dots so dragging/clicking lands here */
   background: linear-gradient(
     90deg,
     var(--color-accent) 0%,
@@ -170,49 +178,33 @@
   cursor: not-allowed;
 }
 
+/* Thumb is hidden — the dots ARE the visible value indicator. The
+   range input still handles drag + keyboard + a11y; the thumb just
+   needs non-zero dimensions so the input remains operable cross-browser. */
 .radiusSliderInput::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 2.5px solid var(--color-accent);
-  box-shadow: var(--shadow-cta);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   cursor: grab;
-  transition:
-    transform var(--duration-base) var(--ease-spring),
-    box-shadow var(--duration-fast) var(--ease-out);
-  margin-top: -6px; /* vertically center on the 6px track */
-}
-
-.radiusSliderInput::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: var(--shadow-cta-hover);
 }
 
 .radiusSliderInput:active::-webkit-slider-thumb {
-  transform: scale(1.2);
   cursor: grabbing;
-  box-shadow: var(--shadow-cta-hover);
 }
 
 .radiusSliderInput::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 2.5px solid var(--color-accent);
-  box-shadow: var(--shadow-cta);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   cursor: grab;
-  transition:
-    transform var(--duration-base) var(--ease-spring),
-    box-shadow var(--duration-fast) var(--ease-out);
-}
-
-.radiusSliderInput::-moz-range-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: var(--shadow-cta-hover);
 }
 
 .radiusSliderInput::-moz-range-track {
@@ -225,32 +217,48 @@
   filter: drop-shadow(0 0 0 4px var(--color-accent-soft));
 }
 
-.radiusSliderTicks {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  margin-top: 0.625rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--color-text-tertiary);
-  letter-spacing: 0.02em;
+/* Dots sit on top of the track, one per snap stop. Flex with
+   space-between aligns dot centers to 0/25/50/75/100% of the track
+   width — same percentages the range input maps to. */
+.radiusSliderDots {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   pointer-events: none;
+  z-index: 1;
+  padding: 0 0; /* the track itself has the side padding */
 }
 
-.radiusSliderTick {
-  text-align: center;
-  transition: color var(--duration-fast) var(--ease-out);
+.radiusSliderDot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: -0.01em;
+  box-shadow: var(--shadow-xs);
+  transition:
+    transform var(--duration-base) var(--ease-spring),
+    background var(--duration-base) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
 }
 
-.radiusSliderTick:first-child {
-  text-align: left;
-}
-
-.radiusSliderTick:last-child {
-  text-align: right;
-}
-
-.radiusSliderTickActive {
-  color: var(--color-accent);
+.radiusSliderDotActive {
+  background: var(--gradient-cta);
+  color: var(--color-text-inverse);
+  border-color: transparent;
+  transform: scale(1.18);
+  box-shadow: var(--shadow-cta);
 }
 
 /* Legacy radius rail label (kept in case the chip version is referenced
