@@ -8,7 +8,7 @@ import { ACTIVITY_TYPE_META, type ActivityType, type BookingStatus } from '@/lib
 import styles from './styles.module.css';
 
 export const metadata: Metadata = {
-  title: 'Messages',
+  title: 'Chat',
 };
 
 // /chat — message inbox. Lists every booking the caller participates in
@@ -142,9 +142,9 @@ export default async function ChatIndexPage() {
     <AppShell loginRedirectTo="/chat">
       <main className={styles.inboxShell}>
         <header className={styles.inboxHeader}>
-          <h1 className={styles.inboxTitle}>Messages</h1>
+          <h1 className={styles.inboxTitle}>Chat</h1>
           <p className={styles.inboxLede}>
-            Every booking has its own thread. Newest activity first.
+            Every booking has its own conversation. Newest activity first.
           </p>
         </header>
 

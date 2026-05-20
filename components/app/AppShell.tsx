@@ -67,7 +67,7 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
                 Plans
               </Link>
               <Link href="/chat" className={styles.navLink}>
-                Messages
+                Chat
               </Link>
             </nav>
             <div className={styles.right}>

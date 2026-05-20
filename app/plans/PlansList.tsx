@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Avatar, Badge, Button, Card, EmptyState } from '@/components/ui';
 import { StatusMessage } from '@/components/StatusMessage';
+import { useChatDock } from '@/lib/chat/dock-context';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import {
   ACTIVITY_TYPE_META,
@@ -77,6 +78,7 @@ function bookingStatusClass(status: BookingStatus): string {
 }
 
 export function PlansList() {
+  const { openChat } = useChatDock();
   const [tab, setTab] = useState<Tab>('upcoming');
   const [bookings, setBookings] = useState<BookingListItem[] | null>(null);
   const [inbound, setInbound] = useState<RequestListItem[]>([]);
@@ -314,30 +316,40 @@ export function PlansList() {
 
             {upcomingBookings.map((b) => {
               const meta = ACTIVITY_TYPE_META[b.activity_type];
+              const counterpart = b.counterpart_name ?? 'Your companion';
               return (
-                <Card key={b.id} as={Link} href={`/plans/by-booking/${b.id}`} shadow>
-                  <div className={styles.row}>
-                    <Avatar name={b.counterpart_name ?? 'Your companion'} size={56} />
-                    <div className={styles.rowMain}>
-                      <p className={styles.rowName}>{b.counterpart_name ?? 'Your companion'}</p>
-                      <p className={styles.rowMeta}>
-                        {b.venue_name} · {formatScheduled(b.scheduled_time)}
-                      </p>
-                      <div style={{ marginTop: '0.375rem', display: 'flex', gap: '0.375rem' }}>
-                        <Badge activity={b.activity_type}>{meta.label}</Badge>
-                        <span
-                          className={[styles.statusPill, bookingStatusClass(b.status)].join(' ')}
-                        >
-                          {b.status}
-                        </span>
-                      </div>
-                    </div>
-                    <span
-                      aria-hidden
-                      style={{ color: 'var(--color-text-secondary)', fontSize: '1.25rem' }}
+                <Card key={b.id} shadow>
+                  <div className={styles.bookingRow}>
+                    <Link
+                      href={`/plans/by-booking/${b.id}`}
+                      className={styles.bookingRowLink}
+                      aria-label={`Open plan details with ${counterpart}`}
                     >
-                      ›
-                    </span>
+                      <Avatar name={counterpart} size={56} />
+                      <div className={styles.rowMain}>
+                        <p className={styles.rowName}>{counterpart}</p>
+                        <p className={styles.rowMeta}>
+                          {b.venue_name} · {formatScheduled(b.scheduled_time)}
+                        </p>
+                        <div style={{ marginTop: '0.375rem', display: 'flex', gap: '0.375rem' }}>
+                          <Badge activity={b.activity_type}>{meta.label}</Badge>
+                          <span
+                            className={[styles.statusPill, bookingStatusClass(b.status)].join(' ')}
+                          >
+                            {b.status}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      className={styles.bookingChatButton}
+                      aria-label={`Chat with ${counterpart}`}
+                      title={`Chat with ${counterpart}`}
+                      onClick={() => openChat(b.id)}
+                    >
+                      <span aria-hidden>💬</span>
+                    </button>
                   </div>
                 </Card>
               );

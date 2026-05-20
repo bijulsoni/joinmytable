@@ -59,6 +59,65 @@
   gap: 0.75rem;
 }
 
+/* Confirmed-booking row in Upcoming: left side navigates to the
+   detail page, right side is an inline chat button that pops the
+   conversation in the floating dock. */
+
+.bookingRow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.bookingRowLink {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-md);
+  margin: -0.25rem;
+  padding: 0.25rem;
+}
+
+.bookingRowLink:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.bookingChatButton {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-size: 1.125rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.bookingChatButton:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  transform: translateY(-1px);
+}
+
+.bookingChatButton:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .rowMain {
   min-width: 0;
 }
