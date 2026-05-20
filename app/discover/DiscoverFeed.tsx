@@ -253,7 +253,8 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
                     mi === radiusMi ? styles.radiusSliderDotActive : ''
                   }`}
                 >
-                  {mi}
+                  <span className={styles.radiusSliderDotNum}>{mi}</span>
+                  <span className={styles.radiusSliderDotUnit}>mi</span>
                 </span>
               ))}
             </div>
