@@ -6,7 +6,7 @@ import { Avatar, Badge, Card, EmptyState } from '@/components/ui';
 import { StatusMessage } from '@/components/StatusMessage';
 import { AppShell } from '@/components/app';
 import { getSessionUser } from '@/lib/auth/session';
-import { ActivityPicker } from './ActivityPicker';
+import { RequestComposer } from './RequestComposer';
 import { ACTIVITY_TYPES } from '@/lib/types';
 import type { PublicCompanionProfileDTO } from '@/app/api/profiles/_lib/types';
 import styles from './styles.module.css';
@@ -120,12 +120,17 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
 
         <section className={styles.section} aria-labelledby="activities-heading">
           <h2 id="activities-heading" className={styles.sectionHeading}>
-            Pick an activity
+            Request an activity
           </h2>
           {offered.length === 0 ? (
             <EmptyState title="No activities listed yet" />
           ) : (
-            <ActivityPicker companionId={profile.user_id} offered={offered} rates={profile.rates} />
+            <RequestComposer
+              companionId={profile.user_id}
+              companionFirstName={profile.name.split(' ')[0] ?? profile.name}
+              offered={offered}
+              rates={profile.rates}
+            />
           )}
         </section>
 

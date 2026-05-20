@@ -187,11 +187,20 @@ async function main() {
     const cp = await call(seeker, 'GET', first);
     const cpBody = await cp.text();
     assertOkHtml(cp, cpBody, `companion profile ${first}`);
-    // Sticky CTA should link to /requests?companion=... — HTML entities
-    // mean `&` is encoded as `&amp;`, so match either form.
-    const ctaHref = cpBody.match(/\/requests\?companion=[a-f0-9-]+(?:&|&amp;)activity=[a-z_]+/);
-    if (ctaHref) ok('companion profile sticky CTA → /requests?companion=…&activity=…');
-    else fail('companion profile sticky CTA', 'no request CTA href found');
+    // Inline composer now lives directly on the profile — verify the
+    // activity tiles + the in-page form (date input + submit button)
+    // are present. There is no longer a deep-link CTA to /requests.
+    const hasTiles = /data-activity="(lunch|dinner|coffee|happy_hour)"/.test(cpBody);
+    const hasDateInput = /type="date"/.test(cpBody);
+    const hasSubmit = /type="submit"/.test(cpBody);
+    if (hasTiles && hasDateInput && hasSubmit) {
+      ok('companion profile inline composer (tiles + date + submit)');
+    } else {
+      fail(
+        'companion profile inline composer',
+        `tiles=${hasTiles} date=${hasDateInput} submit=${hasSubmit}`,
+      );
+    }
   }
 
   // Send a real request via the form's POST target.

@@ -307,3 +307,72 @@
   font-size: 0.6875rem;
   font-weight: 700;
 }
+
+/* -------- Inline request composer (form) ------------------------- */
+
+.composerForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+  opacity: 0.55;
+  transition: opacity var(--duration-base) var(--ease-out);
+}
+
+.composerForm[data-revealed='true'] {
+  opacity: 1;
+}
+
+.composerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.composerSectionLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.composerDateRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.625rem;
+}
+
+.composerBudgetRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.composerBudgetButton {
+  flex: 1;
+  appearance: none;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  padding: 0.625rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  min-height: 44px;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.composerBudgetButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.composerBudgetButton[aria-pressed='true'] {
+  border-color: var(--color-text-primary);
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
+}
