@@ -100,8 +100,167 @@
   display: none;
 }
 
-/* Radius selector — same chip pattern as activities, with a leading label. */
+/* Radius slider — fancy horizontal range control with snap ticks.
+ * The native <input type="range"> handles the keyboard / drag UX. We
+ * style the track with a coral→mint progress gradient computed live
+ * from --radius-progress (set inline as a percentage), draw a big
+ * shadowed coral thumb, and lay tick labels underneath. */
 
+.radiusSlider {
+  margin: 0.25rem 0 1.25rem;
+  padding: 0.875rem 1rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+
+.radiusSliderHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.625rem;
+}
+
+.radiusSliderLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.radiusSliderValue {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  background: var(--gradient-cta);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-variation-settings:
+    'opsz' 32,
+    'SOFT' 50;
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+
+.radiusSliderTrack {
+  position: relative;
+  height: 44px;
+  padding-top: 4px;
+}
+
+.radiusSliderInput {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(
+    90deg,
+    var(--color-accent) 0%,
+    var(--color-mint) var(--radius-progress, 0%),
+    var(--color-border) var(--radius-progress, 0%),
+    var(--color-border) 100%
+  );
+  border-radius: var(--radius-pill);
+  outline: none;
+  cursor: pointer;
+  transition: filter var(--duration-fast) var(--ease-out);
+}
+
+.radiusSliderInput:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.radiusSliderInput::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--color-accent);
+  box-shadow: var(--shadow-cta);
+  cursor: grab;
+  transition:
+    transform var(--duration-base) var(--ease-spring),
+    box-shadow var(--duration-fast) var(--ease-out);
+  margin-top: -8px; /* vertically center on the 8px track */
+}
+
+.radiusSliderInput::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: var(--shadow-cta-hover);
+}
+
+.radiusSliderInput:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+  cursor: grabbing;
+  box-shadow: var(--shadow-cta-hover);
+}
+
+.radiusSliderInput::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--color-accent);
+  box-shadow: var(--shadow-cta);
+  cursor: grab;
+  transition:
+    transform var(--duration-base) var(--ease-spring),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.radiusSliderInput::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: var(--shadow-cta-hover);
+}
+
+.radiusSliderInput::-moz-range-track {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: transparent; /* the gradient is on the input bg */
+}
+
+.radiusSliderInput:focus-visible {
+  filter: drop-shadow(0 0 0 4px var(--color-accent-soft));
+}
+
+.radiusSliderTicks {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.radiusSliderTick {
+  text-align: center;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.radiusSliderTick:first-child {
+  text-align: left;
+}
+
+.radiusSliderTick:last-child {
+  text-align: right;
+}
+
+.radiusSliderTickActive {
+  color: var(--color-accent);
+}
+
+/* Legacy radius rail label (kept in case the chip version is referenced
+   elsewhere — safe to remove later). */
 .radiusRail {
   display: flex;
   align-items: center;

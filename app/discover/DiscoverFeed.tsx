@@ -215,20 +215,49 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
       ) : null}
 
       {location.status === 'granted' ? (
-        <section className={styles.radiusRail} aria-label="Search radius">
-          <span className={styles.radiusLabel}>Within</span>
-          {RADIUS_OPTIONS_MI.map((mi) => (
-            <button
-              key={mi}
-              type="button"
-              className={`${styles.chip} ${radiusMi === mi ? styles.chipActive : ''}`}
-              aria-pressed={radiusMi === mi}
-              onClick={() => handleRadiusChange(mi)}
+        <section className={styles.radiusSlider} aria-label="Search radius">
+          <div className={styles.radiusSliderHead}>
+            <span className={styles.radiusSliderLabel}>Within</span>
+            <span className={styles.radiusSliderValue}>{radiusMi} mi</span>
+          </div>
+          <div
+            className={styles.radiusSliderTrack}
+            style={
+              {
+                ['--radius-progress' as string]: `${
+                  (RADIUS_OPTIONS_MI.indexOf(radiusMi) / (RADIUS_OPTIONS_MI.length - 1)) * 100
+                }%`,
+              } as React.CSSProperties
+            }
+          >
+            <input
+              type="range"
+              min={0}
+              max={RADIUS_OPTIONS_MI.length - 1}
+              step={1}
+              value={RADIUS_OPTIONS_MI.indexOf(radiusMi)}
+              onChange={(e) => {
+                const next = RADIUS_OPTIONS_MI[Number(e.target.value)];
+                if (next !== undefined) handleRadiusChange(next);
+              }}
               disabled={refreshing}
-            >
-              {mi} mi
-            </button>
-          ))}
+              aria-label="Search radius in miles"
+              aria-valuetext={`${radiusMi} miles`}
+              className={styles.radiusSliderInput}
+            />
+            <div className={styles.radiusSliderTicks} aria-hidden>
+              {RADIUS_OPTIONS_MI.map((mi) => (
+                <span
+                  key={mi}
+                  className={`${styles.radiusSliderTick} ${
+                    mi === radiusMi ? styles.radiusSliderTickActive : ''
+                  }`}
+                >
+                  {mi}
+                </span>
+              ))}
+            </div>
+          </div>
         </section>
       ) : null}
 
