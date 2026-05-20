@@ -97,6 +97,32 @@
   padding: 0.25rem;
 }
 
+/* Pending request row (both inbound + outbound). Clickable header
+   that navigates to /plans/[id] for the full detail view. For inbound
+   rows, the Accept/Decline buttons live as siblings below the link
+   so they remain independently clickable. */
+
+.pendingRowLink {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-md);
+  margin: -0.25rem;
+  padding: 0.25rem;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.pendingRowLink:hover {
+  background: var(--color-surface-muted);
+}
+
+.pendingRowLink:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .bookingRowLink:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);

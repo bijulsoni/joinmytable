@@ -240,13 +240,18 @@ export function PlansList() {
           <>
             {pendingInbound.map((r) => {
               const meta = ACTIVITY_TYPE_META[r.activity_type];
+              const counterpart = r.counterpart_name ?? 'A seeker';
               return (
                 <Card key={r.id} shadow>
-                  <div className={styles.row}>
-                    <Avatar name={r.counterpart_name ?? 'A seeker'} size={56} />
+                  <Link
+                    href={`/plans/${r.id}`}
+                    className={styles.pendingRowLink}
+                    aria-label={`Open request from ${counterpart}`}
+                  >
+                    <Avatar name={counterpart} size={56} />
                     <div className={styles.rowMain}>
                       <p className={styles.rowName}>
-                        {r.counterpart_name ?? 'A seeker'} wants to share {meta.label.toLowerCase()}
+                        {counterpart} wants to share {meta.label.toLowerCase()}
                       </p>
                       <p className={styles.rowMeta}>
                         {r.venue_name ? `${r.venue_name} · ` : ''}
@@ -266,23 +271,23 @@ export function PlansList() {
                           Awaiting your response
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                        <Button
-                          variant="primary"
-                          loading={respondingId === r.id}
-                          onClick={() => void respond(r.id, 'accepted')}
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          loading={respondingId === r.id}
-                          onClick={() => void respond(r.id, 'declined')}
-                        >
-                          Decline
-                        </Button>
-                      </div>
                     </div>
+                  </Link>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                    <Button
+                      variant="primary"
+                      loading={respondingId === r.id}
+                      onClick={() => void respond(r.id, 'accepted')}
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      loading={respondingId === r.id}
+                      onClick={() => void respond(r.id, 'declined')}
+                    >
+                      Decline
+                    </Button>
                   </div>
                 </Card>
               );
@@ -290,14 +295,17 @@ export function PlansList() {
 
             {pendingOutbound.map((r) => {
               const meta = ACTIVITY_TYPE_META[r.activity_type];
+              const counterpart = r.counterpart_name ?? 'your companion';
               return (
                 <Card key={r.id}>
-                  <div className={styles.row}>
-                    <Avatar name={r.counterpart_name ?? 'A companion'} size={56} />
+                  <Link
+                    href={`/plans/${r.id}`}
+                    className={styles.pendingRowLink}
+                    aria-label={`Open your request to ${counterpart}`}
+                  >
+                    <Avatar name={counterpart} size={56} />
                     <div className={styles.rowMain}>
-                      <p className={styles.rowName}>
-                        Waiting on {r.counterpart_name ?? 'your companion'}
-                      </p>
+                      <p className={styles.rowName}>Waiting on {counterpart}</p>
                       <p className={styles.rowMeta}>
                         {meta.label} · {formatScheduled(r.proposed_time)}
                         {r.venue_name ? ` · ${r.venue_name}` : ''}
@@ -309,7 +317,13 @@ export function PlansList() {
                         </span>
                       </div>
                     </div>
-                  </div>
+                    <span
+                      aria-hidden
+                      style={{ color: 'var(--color-text-secondary)', fontSize: '1.25rem' }}
+                    >
+                      ›
+                    </span>
+                  </Link>
                 </Card>
               );
             })}
