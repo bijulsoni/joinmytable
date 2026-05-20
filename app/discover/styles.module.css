@@ -107,7 +107,7 @@
  * shadowed coral thumb, and lay tick labels underneath. */
 
 .radiusSlider {
-  margin: 0.25rem 0 0.875rem;
+  margin: 0.25rem 0 1.5rem;
   padding: 0;
 }
 
@@ -115,7 +115,7 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .radiusSliderLabel {
@@ -228,7 +228,7 @@
 .radiusSliderTicks {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  margin-top: 0.25rem;
+  margin-top: 0.625rem;
   font-size: 0.6875rem;
   font-weight: 600;
   color: var(--color-text-tertiary);
