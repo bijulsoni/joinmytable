@@ -187,18 +187,19 @@ async function main() {
     const cp = await call(seeker, 'GET', first);
     const cpBody = await cp.text();
     assertOkHtml(cp, cpBody, `companion profile ${first}`);
-    // Inline composer now lives directly on the profile — verify the
-    // activity tiles + the in-page form (date input + submit button)
-    // are present. There is no longer a deep-link CTA to /requests.
+    // Inline composer renders tiles on first paint; the date/venue form
+    // only mounts after the user taps a tile (avoids cluttering the
+    // page with disabled inputs). So we only assert the tiles + the
+    // radiogroup label here — the form fields are out of scope for an
+    // SSR-only fetch harness.
     const hasTiles = /data-activity="(lunch|dinner|coffee|happy_hour)"/.test(cpBody);
-    const hasDateInput = /type="date"/.test(cpBody);
-    const hasSubmit = /type="submit"/.test(cpBody);
-    if (hasTiles && hasDateInput && hasSubmit) {
-      ok('companion profile inline composer (tiles + date + submit)');
+    const hasRadiogroup = /aria-label="Pick an activity"/.test(cpBody);
+    if (hasTiles && hasRadiogroup) {
+      ok('companion profile inline composer (tiles + radiogroup)');
     } else {
       fail(
         'companion profile inline composer',
-        `tiles=${hasTiles} date=${hasDateInput} submit=${hasSubmit}`,
+        `tiles=${hasTiles} radiogroup=${hasRadiogroup}`,
       );
     }
   }

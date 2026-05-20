@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { Avatar, Badge, Card, EmptyState } from '@/components/ui';
+import { Avatar, EmptyState } from '@/components/ui';
 import { StatusMessage } from '@/components/StatusMessage';
 import { AppShell } from '@/components/app';
 import { getSessionUser } from '@/lib/auth/session';
@@ -19,8 +19,13 @@ export const metadata: Metadata = {
 //
 // Wired to the frozen profiles API (GET /api/profiles/[id]). RLS hides
 // unverified companions; we return 404 in that case too so we never
-// disclose existence. Reviews list is rendered against a placeholder
-// until /api/reviews/companion/[id] ships (Core API + Trust & Safety).
+// disclose existence.
+//
+// Page is intentionally lean: hero + the request composer up top, with
+// the bio tucked into a tap-to-expand row. Availability windows and the
+// reviews placeholder are deliberately not surfaced here — the former
+// adds friction without aiding the request flow, and the latter has no
+// real data to show until the reviews API ships.
 
 interface ProfileResponse {
   profile: PublicCompanionProfileDTO;
@@ -135,68 +140,16 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
         </section>
 
         {profile.bio ? (
-          <section className={styles.section} aria-labelledby="bio-heading">
-            <h2 id="bio-heading" className={styles.sectionHeading}>
-              About
-            </h2>
+          <details className={styles.aboutDetails}>
+            <summary className={styles.aboutSummary}>
+              <span>About {profile.name.split(' ')[0]}</span>
+              <span className={styles.aboutChevron} aria-hidden>
+                ›
+              </span>
+            </summary>
             <p className={styles.bio}>{profile.bio}</p>
-          </section>
+          </details>
         ) : null}
-
-        <section className={styles.section} aria-labelledby="availability-heading">
-          <h2 id="availability-heading" className={styles.sectionHeading}>
-            Availability
-          </h2>
-          {profile.availability.length === 0 ? (
-            <EmptyState title="No availability windows posted yet">
-              Send a request with your preferred time and {profile.name.split(' ')[0]} can confirm.
-            </EmptyState>
-          ) : (
-            <div className={styles.ratesList}>
-              {profile.availability.map((slot) => (
-                <Card key={slot.id} variant="flat">
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                    }}
-                  >
-                    <span style={{ fontWeight: 600 }}>{slot.day_or_date}</span>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{slot.time_range}</span>
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: '0.25rem',
-                      marginTop: '0.5rem',
-                    }}
-                  >
-                    {slot.activity_types.map((a) => (
-                      <Badge key={a} activity={a} />
-                    ))}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className={styles.section} aria-labelledby="reviews-heading">
-          <h2 id="reviews-heading" className={styles.sectionHeading}>
-            Reviews
-          </h2>
-          {/*
-          The /api/reviews/companion/[id] endpoint is not live yet
-          (planned for Phase 5 — Trust & Safety). Until then we render a
-          friendly placeholder rather than a broken list.
-        */}
-          <EmptyState title="Reviews coming soon">
-            We&apos;ll show reviews from past meet-ups here as soon as the reviews API ships.
-          </EmptyState>
-        </section>
       </main>
     </AppShell>
   );

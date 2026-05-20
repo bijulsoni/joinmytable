@@ -241,99 +241,80 @@ export function RequestComposer({ companionId, companionFirstName, offered, rate
         })}
       </div>
 
-      <form
-        className={styles.composerForm}
-        onSubmit={handleSubmit}
-        noValidate
-        aria-hidden={activity === null}
-        data-revealed={activity !== null}
-      >
-        {submitError ? <StatusMessage tone="error">{submitError}</StatusMessage> : null}
+      {activity !== null ? (
+        <form className={styles.composerForm} onSubmit={handleSubmit} noValidate>
+          {submitError ? <StatusMessage tone="error">{submitError}</StatusMessage> : null}
 
-        <div className={styles.composerSection}>
-          <span className={styles.composerSectionLabel}>When</span>
-          <div className={styles.composerDateRow}>
-            <Input
-              type="date"
-              label={<span className="sr-only">Date</span>}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              min={todayLocal()}
-              required
-              disabled={activity === null}
-            />
-            <Input
-              type="time"
-              label={<span className="sr-only">Time</span>}
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              required
-              disabled={activity === null}
-            />
+          <div className={styles.composerSection}>
+            <span className={styles.composerSectionLabel}>When</span>
+            <div className={styles.composerDateRow}>
+              <Input
+                type="date"
+                label={<span className="sr-only">Date</span>}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                min={todayLocal()}
+                required
+              />
+              <Input
+                type="time"
+                label={<span className="sr-only">Time</span>}
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                required
+              />
+            </div>
           </div>
-        </div>
 
-        <Input
-          label="Venue name"
-          help="Public venue only — café, restaurant, or bar."
-          value={venueName}
-          onChange={(e) => setVenueName(e.target.value)}
-          required
-          disabled={activity === null}
-          placeholder={
-            activity
-              ? `e.g. ${
-                  ACTIVITY_TYPE_META[activity].venue === 'cafe' ? 'Blue Bottle' : 'a local spot'
-                }`
-              : 'A public venue'
-          }
-        />
+          <Input
+            label="Venue name"
+            help="Public venue only — café, restaurant, or bar."
+            value={venueName}
+            onChange={(e) => setVenueName(e.target.value)}
+            required
+            placeholder={`e.g. ${
+              ACTIVITY_TYPE_META[activity].venue === 'cafe' ? 'Blue Bottle' : 'a local spot'
+            }`}
+          />
 
-        <Input
-          label="Neighborhood or address"
-          help="Helps your companion confirm the spot works for them."
-          optional
-          value={venueLocation}
-          onChange={(e) => setVenueLocation(e.target.value)}
-          disabled={activity === null}
-          placeholder="e.g. Hayes Valley, San Francisco"
-        />
+          <Input
+            label="Neighborhood or address"
+            help="Helps your companion confirm the spot works for them."
+            optional
+            value={venueLocation}
+            onChange={(e) => setVenueLocation(e.target.value)}
+            placeholder="e.g. Hayes Valley, San Francisco"
+          />
 
-        <div className={styles.composerSection}>
-          <span className={styles.composerSectionLabel}>
-            Budget tier (your max for the activity bill)
-          </span>
-          <div className={styles.composerBudgetRow} role="group" aria-label="Budget tier">
-            {BUDGET_TIERS.map((tier) => (
-              <button
-                key={tier}
-                type="button"
-                className={styles.composerBudgetButton}
-                aria-pressed={budget === tier}
-                onClick={() => setBudget(tier)}
-                disabled={activity === null}
-              >
-                {tier}
-              </button>
-            ))}
+          <div className={styles.composerSection}>
+            <span className={styles.composerSectionLabel}>
+              Budget tier (your max for the activity bill)
+            </span>
+            <div className={styles.composerBudgetRow} role="group" aria-label="Budget tier">
+              {BUDGET_TIERS.map((tier) => (
+                <button
+                  key={tier}
+                  type="button"
+                  className={styles.composerBudgetButton}
+                  aria-pressed={budget === tier}
+                  onClick={() => setBudget(tier)}
+                >
+                  {tier}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <Textarea
-          label="Message"
-          optional
-          rows={3}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          disabled={activity === null}
-          placeholder={
-            activity
-              ? `Anything ${companionFirstName} should know — dietary needs, a topic to chat about.`
-              : 'Anything they should know.'
-          }
-        />
+          <Textarea
+            label="Message"
+            help={`A short note so ${companionFirstName} knows what you have in mind — dietary needs, a topic, who you are.`}
+            optional
+            rows={3}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder={`Hi ${companionFirstName} — looking forward to chatting!`}
+          />
 
-        {activity ? (
           <Card variant="flat" padded>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
               <span style={{ fontWeight: 600 }}>{ACTIVITY_TYPE_META[activity].label} fee</span>
@@ -350,19 +331,14 @@ export function RequestComposer({ companionId, companionFirstName, offered, rate
               until after your meet.
             </p>
           </Card>
-        ) : null}
 
-        <div className={styles.stickyCta}>
-          <Button
-            type="submit"
-            fullWidth
-            loading={submitting}
-            disabled={activity === null || submitting}
-          >
-            {ctaLabel}
-          </Button>
-        </div>
-      </form>
+          <div className={styles.stickyCta}>
+            <Button type="submit" fullWidth loading={submitting} disabled={submitting}>
+              {ctaLabel}
+            </Button>
+          </div>
+        </form>
+      ) : null}
     </>
   );
 }
