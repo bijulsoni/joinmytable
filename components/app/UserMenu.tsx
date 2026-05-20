@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { ReportIssueDialog } from './ReportIssueDialog';
 import styles from './UserMenu.module.css';
 
 interface UserMenuProps {
@@ -15,6 +16,7 @@ interface UserMenuProps {
 // POST so it works without JS.
 export function UserMenu({ name, email, initials }: UserMenuProps) {
   const [open, setOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,6 +75,17 @@ export function UserMenu({ name, email, initials }: UserMenuProps) {
           >
             <span aria-hidden>✓</span> Identity &amp; verification
           </Link>
+          <button
+            type="button"
+            className={styles.item}
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              setReportOpen(true);
+            }}
+          >
+            <span aria-hidden>💬</span> Report an issue
+          </button>
           <div className={styles.divider} aria-hidden />
           <form action="/logout" method="post" className={styles.signoutForm}>
             <button type="submit" className={`${styles.item} ${styles.signout}`} role="menuitem">
@@ -81,6 +94,7 @@ export function UserMenu({ name, email, initials }: UserMenuProps) {
           </form>
         </div>
       ) : null}
+      <ReportIssueDialog open={reportOpen} onClose={() => setReportOpen(false)} />
     </div>
   );
 }

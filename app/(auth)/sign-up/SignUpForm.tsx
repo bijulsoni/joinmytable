@@ -69,6 +69,28 @@ export function SignUpForm() {
         <p className={styles.helpText}>At least 8 characters.</p>
       </div>
 
+      <div className={styles.field}>
+        <label htmlFor="inviteCode" className={styles.label}>
+          Invite code
+        </label>
+        <input
+          id="inviteCode"
+          name="inviteCode"
+          type="text"
+          required
+          maxLength={40}
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          placeholder="TABLE-XXXX-XX"
+          className={styles.input}
+          style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
+        />
+        <p className={styles.helpText}>
+          JoinMyTable is in private beta. Ask whoever invited you for a code.
+        </p>
+      </div>
+
       <label className={styles.checkboxRow}>
         <input type="checkbox" name="acceptGuidelines" required />
         I&apos;ve read and accept the community guidelines.

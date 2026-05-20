@@ -222,6 +222,49 @@ export type ReviewInsert = Insert<ReviewRow, 'rating'>;
 export type ReviewUpdate = never;
 
 // ---------------------------------------------------------------------------
+// invite_codes / invite_redemptions  (beta gate; see 20260520000100)
+// ---------------------------------------------------------------------------
+
+export interface InviteCodeRow {
+  id: string;
+  code: string;
+  note: string | null;
+  max_uses: number | null;
+  used_count: number;
+  expires_at: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+export type InviteCodeInsert = Insert<InviteCodeRow, 'code'>;
+export type InviteCodeUpdate = Partial<InviteCodeRow>;
+
+export interface InviteRedemptionRow {
+  id: string;
+  invite_code_id: string;
+  user_id: string;
+  redeemed_at: string;
+}
+export type InviteRedemptionInsert = Insert<InviteRedemptionRow, 'invite_code_id' | 'user_id'>;
+/** redemptions are immutable. */
+export type InviteRedemptionUpdate = never;
+
+// ---------------------------------------------------------------------------
+// feedback_reports  (in-app "Report an issue"; see 20260520000100)
+// ---------------------------------------------------------------------------
+
+export interface FeedbackReportRow {
+  id: string;
+  user_id: string;
+  category: 'bug' | 'idea' | 'complaint' | 'other';
+  body: string;
+  url: string | null;
+  created_at: string;
+}
+export type FeedbackReportInsert = Insert<FeedbackReportRow, 'category' | 'body'>;
+/** reports are immutable from the client. */
+export type FeedbackReportUpdate = never;
+
+// ---------------------------------------------------------------------------
 // Aggregated `Database` shape — type parameter for createClient<Database>()
 // ---------------------------------------------------------------------------
 
@@ -274,6 +317,24 @@ export interface Database {
         Row: ReviewRow;
         Insert: ReviewInsert;
         Update: ReviewUpdate;
+        Relationships: [];
+      };
+      invite_codes: {
+        Row: InviteCodeRow;
+        Insert: InviteCodeInsert;
+        Update: InviteCodeUpdate;
+        Relationships: [];
+      };
+      invite_redemptions: {
+        Row: InviteRedemptionRow;
+        Insert: InviteRedemptionInsert;
+        Update: InviteRedemptionUpdate;
+        Relationships: [];
+      };
+      feedback_reports: {
+        Row: FeedbackReportRow;
+        Insert: FeedbackReportInsert;
+        Update: FeedbackReportUpdate;
         Relationships: [];
       };
     };
