@@ -126,6 +126,34 @@ export async function uploadAvatar(file: Blob): Promise<StorageUploadResult | St
 }
 
 /**
+ * Upload one photo for the signed-in user's companion gallery (the
+ * `companion_profiles.photo_urls` array). Unlike `uploadAvatar` which
+ * overwrites a single slot, each call here creates a new object so
+ * users can build up a multi-photo gallery.
+ */
+export async function uploadCompanionPhoto(
+  file: Blob,
+): Promise<StorageUploadResult | StorageUploadError> {
+  const supabase = await authServerClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: 'Not signed in.' };
+
+  const ext = mimeToExt(file.type);
+  // Random suffix so two uploads in the same ms don't collide.
+  const suffix = Math.random().toString(36).slice(2, 8);
+  const objectKey = `${auth.user.id}/gallery-${Date.now()}-${suffix}.${ext}`;
+
+  return uploadBlob({
+    bucket: AVATAR_BUCKET,
+    objectKey,
+    file,
+    publicBucket: true,
+    upsert: false,
+    maxBytes: AVATAR_MAX_BYTES,
+  });
+}
+
+/**
  * Upload a companion identity-verification document. Stored in a
  * private bucket; the only consumer is the (future) admin review tool.
  */
@@ -155,6 +183,13 @@ export async function avatarPublicUrl(avatarPath: string | null): Promise<string
   const admin = createSupabaseAdminClient();
   const { data } = admin.storage.from(AVATAR_BUCKET).getPublicUrl(avatarPath);
   return data.publicUrl ?? null;
+}
+
+/** Resolve the public URL for any object stored in the avatars bucket. */
+export function avatarBucketPublicUrl(objectPath: string): string {
+  const admin = createSupabaseAdminClient();
+  const { data } = admin.storage.from(AVATAR_BUCKET).getPublicUrl(objectPath);
+  return data.publicUrl;
 }
 
 function mimeToExt(mime: string): string {
