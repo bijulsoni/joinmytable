@@ -2,17 +2,24 @@
 
 .shell {
   min-height: 100dvh;
-  background: var(--color-background);
+  background: var(--gradient-hero);
+  background-attachment: fixed;
 }
 
 .header {
-  padding: 1rem 1.25rem 0.5rem;
+  padding: 1.25rem 1.25rem 0.5rem;
 }
 
 .title {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variation-settings:
+    'opsz' 48,
+    'SOFT' 50;
+  color: var(--color-text-primary);
 }
 
 .tabs {
@@ -35,14 +42,22 @@
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   min-height: 40px;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-base) var(--ease-spring);
+}
+
+.tab:hover {
+  color: var(--color-text-primary);
 }
 
 .tab[aria-selected='true'] {
-  color: var(--color-text-primary);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
+  color: var(--color-text-inverse);
+  background: var(--gradient-cta);
+  box-shadow: var(--shadow-cta);
 }
 
 .list {
@@ -147,8 +162,8 @@
 }
 
 .confirmed {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-mint-soft);
+  color: var(--color-mint);
 }
 
 .completed {
@@ -159,6 +174,11 @@
 .cancelled {
   background: var(--color-danger-soft);
   color: var(--color-danger);
+}
+
+.awaiting {
+  background: var(--color-sun-soft);
+  color: var(--color-warning);
 }
 
 .skeleton {
@@ -183,10 +203,7 @@
   }
 }
 
-.awaiting {
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
-}
+/* (awaiting moved above into status-pill cluster) */
 
 .cardLink {
   display: block;
