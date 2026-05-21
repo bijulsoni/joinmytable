@@ -12,7 +12,7 @@ import styles from './page.module.css';
 export const metadata: Metadata = {
   title: 'JoinMyTable — Never lunch alone again',
   description:
-    'A two-sided marketplace for shared-activity companionship. Find a companion for coffee, lunch, happy hour, or dinner.',
+    'A friendly, verified companion for coffee, lunch, happy hour, or dinner — at a public venue you both pick.',
 };
 
 const ACTIVITY_COPY: Record<ActivityType, string> = {
@@ -44,16 +44,16 @@ export default async function HomePage() {
         <RotatingActivity />
 
         <p className={styles.lede}>
-          JoinMyTable matches you with a friendly, verified companion for a meal, a drink, or a
-          coffee. You cover the activity and a flat fee. They show up and make it better.
+          A friendly, verified companion for a coffee, lunch, happy hour, or dinner — at a public
+          venue you both pick. You cover the bill and a flat fee. They show up and make it better.
         </p>
 
         <div className={styles.ctaRow}>
-          <Button as="a" href="/sign-up?mode=seeker">
-            Find a companion
+          <Button as="a" href="/sign-up">
+            Create your account
           </Button>
-          <Button as="a" href="/sign-up?mode=companion" variant="secondary">
-            Become a companion
+          <Button as="a" href="/login" variant="secondary">
+            Sign in
           </Button>
         </div>
 
@@ -96,19 +96,18 @@ export default async function HomePage() {
           <ol className={styles.steps}>
             <li>
               <span>
-                <strong>Sign up.</strong> Be a seeker, a companion, or both — one account, two
-                modes.
+                <strong>Sign up.</strong> One account, no roles to pick. Want to be a paid companion
+                yourself? Turn it on from your profile whenever you&apos;re ready.
               </span>
             </li>
             <li>
               <span>
-                <strong>Find a companion.</strong> Filter by activity, time, and price tier near
-                you.
+                <strong>Find someone nearby.</strong> Filter by activity, distance, and rating.
               </span>
             </li>
             <li>
               <span>
-                <strong>Request a meet.</strong> Chat opens the moment your companion accepts.
+                <strong>Send a request.</strong> Chat opens the moment they accept.
               </span>
             </li>
             <li>

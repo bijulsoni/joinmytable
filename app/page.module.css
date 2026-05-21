@@ -55,16 +55,23 @@
   font-weight: 600;
   color: var(--color-text-primary);
   text-decoration: none;
-  padding: 0.5rem 0.875rem;
+  padding: 0.5rem 1rem;
   border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border-strong);
+  box-shadow: var(--shadow-xs);
   transition:
     background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .topbarLogin:hover {
   background: var(--color-surface-muted);
-  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+  color: var(--color-accent-hover);
+  transform: translateY(-1px);
 }
 
 .hero {
