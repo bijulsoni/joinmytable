@@ -14,8 +14,9 @@ export default function CheckEmailPage() {
     <div className={styles.card}>
       <h1 className={styles.heading}>Check your email</h1>
       <p className={styles.subheading}>
-        We&apos;ve sent you a confirmation link. Open it on this device to finish
-        signing in.
+        We&apos;ve sent you a confirmation link. Open it on this device — you&apos;ll land on a
+        short welcome step where you can add a few photos, a bio, and (optionally) list yourself as
+        a paid companion.
       </p>
       <div className={styles.linkRow}>
         <Link href="/login">Back to sign in</Link>

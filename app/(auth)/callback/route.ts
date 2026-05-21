@@ -15,7 +15,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
-  const next = url.searchParams.get('next') ?? '/verify';
+  const next = url.searchParams.get('next') ?? '/welcome';
 
   const response = NextResponse.redirect(new URL(next, request.url));
 

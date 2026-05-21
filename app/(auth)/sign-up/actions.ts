@@ -12,6 +12,7 @@
 // they want without flipping flags first.
 
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { z } from 'zod';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase/server';
 import { createUserMirrorRow } from '@/lib/auth/profile';
@@ -205,12 +206,24 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
     return { status: 'error', message: preflight.message };
   }
 
+  // Build an absolute emailRedirectTo so the confirmation link drops the
+  // user at /(auth)/callback?next=/welcome — which exchanges the code,
+  // sets the session cookie, then redirects into the onboarding flow.
+  // Pull host + proto from the incoming request rather than baking an
+  // env var in; works for dev (localhost), preview deployments, and
+  // production all the same.
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
+  const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
+  const origin = `${proto}://${host}`;
+
   const supabase = await createSupabaseServerClient();
   const { data: authResult, error: authError } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: { name: parsed.data.name },
+      emailRedirectTo: `${origin}/callback?next=/welcome`,
     },
   });
 
@@ -286,8 +299,11 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
     return { status: 'error', message: mirror.error };
   }
 
+  // If email confirmation is off (dev convenience), we get a session
+  // immediately — drop the user straight into onboarding. Otherwise
+  // they'll arrive at /welcome after clicking the confirmation link.
   if (authResult.session) {
-    redirect('/discover');
+    redirect('/welcome');
   }
   redirect('/check-email');
 }

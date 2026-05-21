@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
+import { homePathForUser } from '@/lib/auth/home-path';
 
 const log = logger.child({ module: 'auth.login' });
 
@@ -42,7 +43,19 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     };
   }
 
-  // Mode-split is gone; everyone lands on /discover. They reach /plans
-  // / /chat / /profile through the AppShell nav once they're in.
-  redirect('/discover');
+  // Look up the user's onboarded_at to decide where to land them. A
+  // brand-new account that just confirmed email lands here without
+  // having walked through /welcome yet — bounce them through that
+  // first. Existing users go straight to /discover.
+  const { data: row } = await supabase
+    .from('users')
+    .select('onboarded_at, is_seeker, is_companion')
+    .eq('id', data.user.id)
+    .maybeSingle();
+  redirect(
+    homePathForUser(
+      (row as { onboarded_at: string | null; is_seeker: boolean; is_companion: boolean } | null) ??
+        null,
+    ),
+  );
 }

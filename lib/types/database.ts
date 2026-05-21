@@ -63,6 +63,8 @@ export interface UserRow {
   is_seeker: boolean;
   is_companion: boolean;
   verification_status: VerificationStatus;
+  /** Null until the user finishes the /welcome onboarding flow. */
+  onboarded_at: string | null;
   created_at: string;
 }
 
