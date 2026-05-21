@@ -181,6 +181,19 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
     };
   }
 
+  // Anti-enumeration shape from Supabase Auth: when the email already
+  // exists in auth.users, signUp() returns a "fake" user with empty
+  // identities[] and a bogus id (so attackers can't probe for who's
+  // registered). If we don't catch this, the mirror-row insert below
+  // would fail with users_id_fkey because the id doesn't match an
+  // actual auth.users row — and worse, we'd burn an invite-code slot.
+  if (!authResult.user.identities || authResult.user.identities.length === 0) {
+    return {
+      status: 'error',
+      message: 'An account already exists for this email. Sign in instead.',
+    };
+  }
+
   // Atomically claim a slot. If someone else just took the last slot
   // between preflight and here (race on a 1-use code), bail with a
   // clear message. The orphan auth user is left in place — the email
