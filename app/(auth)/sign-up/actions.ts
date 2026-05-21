@@ -220,6 +220,23 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
   });
   if (!mirror.ok) {
     log.error({ err: mirror.error }, 'mirror row insert failed');
+    // Rollback the auth.users row we just created. Otherwise the email
+    // gets stuck — future sign-up attempts hit Supabase's anti-enumeration
+    // path and the user can never recover. Service-role admin client
+    // cleans up; failures here are logged but not surfaced because the
+    // user-facing message below is what matters.
+    try {
+      const admin = createSupabaseAdminClient();
+      const { error: rollbackErr } = await admin.auth.admin.deleteUser(authResult.user.id);
+      if (rollbackErr) {
+        log.error(
+          { err: rollbackErr.message, userId: authResult.user.id },
+          'orphan rollback failed',
+        );
+      }
+    } catch (err) {
+      log.error({ err: err instanceof Error ? err.message : String(err) }, 'orphan rollback threw');
+    }
     return { status: 'error', message: mirror.error };
   }
 
