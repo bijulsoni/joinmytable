@@ -96,13 +96,12 @@ export default async function HomePage() {
           <ol className={styles.steps}>
             <li>
               <span>
-                <strong>Sign up.</strong> One account, no roles to pick. Want to be a paid companion
-                yourself? Turn it on from your profile whenever you&apos;re ready.
+                <strong>Sign up with your email.</strong> Add a photo and a short bio.
               </span>
             </li>
             <li>
               <span>
-                <strong>Find someone nearby.</strong> Filter by activity, distance, and rating.
+                <strong>Browse nearby companions.</strong> Filter by activity, distance, and rating.
               </span>
             </li>
             <li>
@@ -112,7 +111,7 @@ export default async function HomePage() {
             </li>
             <li>
               <span>
-                <strong>Meet up.</strong> Your fee is held safely until after the activity wraps.
+                <strong>Meet up.</strong> Your fee is held safely until after.
               </span>
             </li>
           </ol>
