@@ -96,7 +96,7 @@ export default async function HomePage() {
           <ol className={styles.steps}>
             <li>
               <span>
-                <strong>Sign up with your email.</strong> Add a photo and a short bio.
+                <strong>Sign up with your email.</strong> Add a few photos and a short bio.
               </span>
             </li>
             <li>
