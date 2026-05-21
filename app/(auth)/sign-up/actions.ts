@@ -84,6 +84,47 @@ async function preflightInvite(
 // argument type to `never` in some versions of @supabase/supabase-js.
 // The schema is enforced by the DB itself + the migration's CHECK
 // constraints, so loose typing here is safe.
+// Release a previously-claimed invite slot. Used when sign-up fails
+// after the claim — we don't want an orphan claim to lock out the
+// code's last slot. Best-effort: errors are logged but ignored.
+async function releaseInvite(row: InviteCodeRow, userId: string): Promise<void> {
+  try {
+    const admin = createSupabaseAdminClient() as unknown as {
+      from: (table: string) => {
+        update: (patch: Record<string, unknown>) => {
+          eq: (col: string, val: unknown) => Promise<{ error: { message: string } | null }>;
+        };
+        delete: () => {
+          eq: (
+            col: string,
+            val: unknown,
+          ) => {
+            eq: (col2: string, val2: unknown) => Promise<{ error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    // Decrement used_count. We accept a small race window if many
+    // claims happened in parallel — the audit row in invite_redemptions
+    // is the source of truth for who actually consumed slots.
+    await admin
+      .from('invite_codes')
+      .update({ used_count: Math.max(0, row.used_count) })
+      .eq('id', row.id);
+    // Wipe any redemption row we may have written for this user.
+    await admin
+      .from('invite_redemptions')
+      .delete()
+      .eq('invite_code_id', row.id)
+      .eq('user_id', userId);
+  } catch (err) {
+    log.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      'invite slot release failed',
+    );
+  }
+}
+
 async function claimInvite(row: InviteCodeRow, userId: string): Promise<boolean> {
   const admin = createSupabaseAdminClient() as unknown as {
     from: (table: string) => {
@@ -220,22 +261,27 @@ export async function signUpAction(_prev: SignUpState, formData: FormData): Prom
   });
   if (!mirror.ok) {
     log.error({ err: mirror.error }, 'mirror row insert failed');
-    // Rollback the auth.users row we just created. Otherwise the email
-    // gets stuck — future sign-up attempts hit Supabase's anti-enumeration
-    // path and the user can never recover. Service-role admin client
-    // cleans up; failures here are logged but not surfaced because the
-    // user-facing message below is what matters.
+    // Rollback in reverse order of how we acquired the side effects:
+    //   1. Release the invite-code slot we just claimed — otherwise the
+    //      code's last seat is permanently consumed for a user that
+    //      doesn't exist.
+    //   2. Delete the auth.users row we just created — otherwise the
+    //      email gets stuck on Supabase's anti-enumeration path.
+    await releaseInvite(preflight.row, authResult.user.id);
     try {
       const admin = createSupabaseAdminClient();
       const { error: rollbackErr } = await admin.auth.admin.deleteUser(authResult.user.id);
       if (rollbackErr) {
         log.error(
           { err: rollbackErr.message, userId: authResult.user.id },
-          'orphan rollback failed',
+          'orphan auth rollback failed',
         );
       }
     } catch (err) {
-      log.error({ err: err instanceof Error ? err.message : String(err) }, 'orphan rollback threw');
+      log.error(
+        { err: err instanceof Error ? err.message : String(err) },
+        'orphan auth rollback threw',
+      );
     }
     return { status: 'error', message: mirror.error };
   }
