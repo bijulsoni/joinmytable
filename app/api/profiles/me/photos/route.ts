@@ -39,10 +39,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (readErr) {
     return apiError('internal_error', 'Could not load companion profile.');
   }
-  if (!profileRaw) {
-    return apiError('conflict', 'Set up your companion profile before adding photos.');
+
+  // Lazy-create the row on first add — same rationale as the upload
+  // endpoint: /welcome onboarding can add photos before any other
+  // profile field is written.
+  let profile: Pick<CompanionProfileRow, 'id' | 'photo_urls'>;
+  if (profileRaw) {
+    profile = profileRaw as Pick<CompanionProfileRow, 'id' | 'photo_urls'>;
+  } else {
+    const { data: inserted, error: insertErr } = await caller.supabase
+      .from('companion_profiles')
+      .insert({ user_id: caller.userId })
+      .select('id, photo_urls')
+      .single();
+    if (insertErr || !inserted) {
+      return apiError(
+        'internal_error',
+        insertErr?.message ?? 'Could not create companion profile.',
+      );
+    }
+    profile = inserted as Pick<CompanionProfileRow, 'id' | 'photo_urls'>;
   }
-  const profile = profileRaw as Pick<CompanionProfileRow, 'id' | 'photo_urls'>;
   const current = profile.photo_urls ?? [];
   if (current.includes(url)) {
     // Idempotent: already in the list, no-op.

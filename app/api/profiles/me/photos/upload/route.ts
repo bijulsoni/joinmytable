@@ -46,10 +46,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (readErr) {
     return apiError('internal_error', 'Could not load companion profile.');
   }
-  if (!profileRaw) {
-    return apiError('conflict', 'Set up your companion profile before adding photos.');
+
+  // Lazy-create the companion_profiles row on first photo upload. The
+  // /welcome onboarding flow lets users add photos before they've hit
+  // Continue (which is the moment the rest of the profile is written),
+  // so the row may not exist yet. RLS allows the caller to insert
+  // their own row.
+  let profile: Pick<CompanionProfileRow, 'id' | 'photo_urls'>;
+  if (profileRaw) {
+    profile = profileRaw as Pick<CompanionProfileRow, 'id' | 'photo_urls'>;
+  } else {
+    const { data: inserted, error: insertErr } = await caller.supabase
+      .from('companion_profiles')
+      .insert({ user_id: caller.userId })
+      .select('id, photo_urls')
+      .single();
+    if (insertErr || !inserted) {
+      return apiError(
+        'internal_error',
+        insertErr?.message ?? 'Could not create companion profile.',
+      );
+    }
+    profile = inserted as Pick<CompanionProfileRow, 'id' | 'photo_urls'>;
   }
-  const profile = profileRaw as Pick<CompanionProfileRow, 'id' | 'photo_urls'>;
   const current = profile.photo_urls ?? [];
   if (current.length >= MAX_PHOTOS) {
     return apiError(
