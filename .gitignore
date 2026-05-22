@@ -53,3 +53,11 @@ supabase/.temp
 # claude code runtime state + multi-agent logs
 .claude/
 orchestration-logs/
+
+# Catch-all: any *.local file (env, scratch notes, etc.) stays local.
+*.local
+!.env.local
+!.env.production.local
+!.env.development.local
+!.env.staging.local
+!.env.test.local
