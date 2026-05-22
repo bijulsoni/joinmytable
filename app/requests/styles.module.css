@@ -115,6 +115,15 @@
   justify-content: center;
 }
 
+/* Same fix as the companion profile composer — keep the sticky CTA above
+   the mobile BottomNav. */
+@media (max-width: 959px) {
+  .stickyCta {
+    bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+    padding-bottom: 0.75rem;
+  }
+}
+
 .stickyCta > * {
   width: 100%;
   max-width: 32rem;

@@ -6,7 +6,10 @@
   background-attachment: fixed;
   display: flex;
   flex-direction: column;
-  padding-bottom: 5.5rem; /* leave room for the sticky request CTA */
+  /* Reserve enough scroll padding for the sticky CTA + (on mobile)
+     the BottomNav above which the CTA now sits. ~5.5rem on desktop,
+     ~9.5rem on mobile (5.5 for the CTA strip + 4 for the bottom nav). */
+  padding-bottom: 5.5rem;
 }
 
 .topbar {
@@ -365,6 +368,21 @@
   z-index: 10;
   display: flex;
   justify-content: center;
+}
+
+/* On mobile the BottomNav (z-index 20) sits at bottom: 0 with height
+   --bottom-nav-height. The sticky Send-request CTA was hiding underneath
+   it. Push the CTA up above the nav so it stays visible. Also widen the
+   page's bottom padding so content can scroll past both. */
+@media (max-width: 959px) {
+  .stickyCta {
+    bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+    padding-bottom: 0.75rem;
+  }
+
+  .shell {
+    padding-bottom: calc(5.5rem + var(--bottom-nav-height));
+  }
 }
 
 .stickyCta > * {
