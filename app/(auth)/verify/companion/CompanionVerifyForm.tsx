@@ -45,11 +45,32 @@ export function CompanionVerifyForm() {
           name="document"
           type="file"
           accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          capture="environment"
           required
           className={styles.input}
         />
         <p className={styles.helpText}>
-          JPG, PNG, WEBP, or HEIC. Up to 10 MB. Stored privately - only the review team can see it.
+          Driver&apos;s license, passport, state ID. JPG/PNG/WEBP/HEIC, up to 10 MB. Stored
+          privately — only the review team sees it.
+        </p>
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="selfie" className={styles.label}>
+          Selfie
+        </label>
+        <input
+          id="selfie"
+          name="selfie"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          capture="user"
+          required
+          className={styles.input}
+        />
+        <p className={styles.helpText}>
+          On phone, this opens your front camera. Hold your ID next to your face if you can — the
+          clearer the match, the faster your review.
         </p>
       </div>
 

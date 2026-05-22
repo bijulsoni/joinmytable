@@ -1,77 +1,75 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { requireSessionUser } from '@/lib/auth/session';
 import { authServerClient } from '@/lib/auth/db';
 import type { VerificationStatus } from '@/lib/types';
 import { CompanionVerifyForm } from './CompanionVerifyForm';
 import styles from '../../styles.module.css';
 
-interface CompanionRow {
-  user_id: string;
-  verification_status: VerificationStatus;
-}
-
 export const metadata: Metadata = {
-  title: 'Companion verification',
+  title: 'Identity verification',
 };
 
+// Verification flow: government ID + selfie → submit → status flips to
+// 'pending'. Admin reviews via scripts/db/verify-companion.mjs and
+// approves with --email or rejects with --revoke.
+//
+// The user's verification_status lives on the `users` row. The
+// companion_profiles row may or may not exist yet — we lazy-create
+// it on submit if needed so the user doesn't get stuck on a
+// "set up your profile first" gate. That older gate caused an infinite
+// loop with /profile when the user hadn't gone through onboarding.
 export default async function CompanionVerifyPage() {
-  const user = await requireSessionUser();
-  if (!user.profile?.is_companion) {
-    redirect('/mode');
-  }
+  const user = await requireSessionUser('/login?next=/verify/companion');
 
+  // Read the canonical verification status from users (NOT
+  // companion_profiles — that column doesn't exist).
   const supabase = await authServerClient();
-  const { data: companionRaw } = await supabase
-    .from('companion_profiles')
-    .select('user_id, verification_status')
-    .eq('user_id', user.id)
+  const { data: row } = await supabase
+    .from('users')
+    .select('verification_status')
+    .eq('id', user.id)
     .maybeSingle();
-  const companion = companionRaw as CompanionRow | null;
+  const status: VerificationStatus =
+    (row as { verification_status: VerificationStatus } | null)?.verification_status ??
+    'unverified';
 
-  if (!companion) {
-    return (
-      <div className={styles.card}>
-        <h1 className={styles.heading}>Set up your companion profile first</h1>
-        <p className={styles.subheading}>
-          We need your rate, service area, and availability before we can verify you.
-        </p>
-        <div className={styles.linkRow}>
-          <Link href="/profile">Open companion profile setup</Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (companion.verification_status === 'pending') {
+  if (status === 'pending') {
     return (
       <div className={styles.card}>
         <h1 className={styles.heading}>Verification in review</h1>
         <p className={styles.subheading}>
-          Thanks - we have what we need. We&apos;ll email you when review is complete.
+          Thanks — we have what we need. We&apos;ll email you when review is complete (usually
+          within a day). Until then, your profile won&apos;t appear in /discover.
         </p>
         <div className={styles.linkRow}>
-          <Link href="/verify">Back to identity</Link>
+          <Link href="/discover">Back to discover</Link>
         </div>
       </div>
     );
   }
 
-  if (companion.verification_status === 'verified') {
+  if (status === 'verified') {
     return (
       <div className={styles.card}>
-        <h1 className={styles.heading}>You&apos;re verified</h1>
-        <p className={styles.subheading}>Seekers can now discover and book you.</p>
+        <h1 className={styles.heading}>You&apos;re verified ✓</h1>
+        <p className={styles.subheading}>
+          Your profile is live in /discover. Seekers can request activities with you, and the
+          verified badge shows on your card.
+        </p>
+        <div className={styles.linkRow}>
+          <Link href="/discover">Back to discover</Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className={styles.card}>
-      <h1 className={styles.heading}>Companion verification</h1>
+      <h1 className={styles.heading}>Identity verification</h1>
       <p className={styles.subheading}>
-        Verification is required before you can be discovered or booked.
+        Konnly is verified-only. Upload a photo of your ID and a quick selfie and we&apos;ll review
+        (usually within a day). It&apos;s also what unlocks being a paid companion in /discover.
       </p>
       <CompanionVerifyForm />
     </div>

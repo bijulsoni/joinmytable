@@ -73,30 +73,72 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
 });
 
 async function listPending() {
-  const { data, error } = await admin
-    .from('companion_profiles')
-    .select('user_id, bio, service_area, photo_urls, created_at, users:users!inner(name, email)')
-    .is('verified_at', null)
+  // The real "needs review" signal is users.verification_status = 'pending'.
+  // The applicant uploaded their ID + selfie and submitted the form;
+  // the action flipped them to pending and we (admin) have to either
+  // approve via --email/--user-id or revoke. Anyone with just a
+  // companion_profiles row but no verification submission shows
+  // verification_status='unverified' and isn't in this list.
+  const { data: pending, error } = await admin
+    .from('users')
+    .select('id, name, email, verification_status, created_at')
+    .eq('verification_status', 'pending')
     .order('created_at', { ascending: false })
     .limit(50);
   if (error) {
     console.error('List failed:', error.message);
     process.exit(2);
   }
-  if (!data || data.length === 0) {
-    console.log('No pending companion profiles. ✨');
+  if (!pending || pending.length === 0) {
+    console.log('No pending verifications. ✨');
     return;
   }
-  console.log(`Pending (${data.length}):\n`);
-  for (const row of data) {
-    const u = row.users ?? {};
-    const photoCount = (row.photo_urls ?? []).length;
-    console.log(`  ${row.user_id}`);
-    console.log(`    ${u.name ?? '?'}  <${u.email ?? '?'}>`);
-    console.log(`    service: ${row.service_area ?? '—'}`);
-    console.log(`    photos: ${photoCount}`);
-    console.log(`    created: ${row.created_at}`);
-    console.log(`    bio: ${(row.bio ?? '').slice(0, 120) || '—'}`);
+
+  console.log(`\nPending verifications (${pending.length}):\n`);
+
+  for (const u of pending) {
+    // Companion profile (optional — they may have applied before
+    // setting up a full profile).
+    const { data: cp } = await admin
+      .from('companion_profiles')
+      .select('bio, service_area')
+      .eq('user_id', u.id)
+      .maybeSingle();
+
+    // List files in the verification bucket under this user's prefix.
+    // Filenames are: id-<ts>.<ext>  and  selfie-<ts>.<ext>
+    const { data: files } = await admin.storage
+      .from('verification')
+      .list(u.id, { sortBy: { column: 'created_at', order: 'desc' } });
+
+    const idFile = (files ?? []).find((f) => f.name.startsWith('id-'));
+    const selfieFile = (files ?? []).find((f) => f.name.startsWith('selfie-'));
+
+    // 1-hour signed URLs — long enough to click through, short enough
+    // that pasting them anywhere by accident doesn't leak forever.
+    let idUrl = '(no upload)';
+    let selfieUrl = '(no upload)';
+    if (idFile) {
+      const { data: signed } = await admin.storage
+        .from('verification')
+        .createSignedUrl(`${u.id}/${idFile.name}`, 60 * 60);
+      if (signed?.signedUrl) idUrl = signed.signedUrl;
+    }
+    if (selfieFile) {
+      const { data: signed } = await admin.storage
+        .from('verification')
+        .createSignedUrl(`${u.id}/${selfieFile.name}`, 60 * 60);
+      if (signed?.signedUrl) selfieUrl = signed.signedUrl;
+    }
+
+    console.log(`  ${u.name ?? '?'}  <${u.email ?? '?'}>  (${u.id})`);
+    console.log(`    applied: ${u.created_at}`);
+    if (cp?.service_area) console.log(`    service area: ${cp.service_area}`);
+    if (cp?.bio) console.log(`    bio: ${cp.bio.slice(0, 120)}`);
+    console.log(`    ID:     ${idUrl}`);
+    console.log(`    Selfie: ${selfieUrl}`);
+    console.log(`    → approve:  node scripts/db/verify-companion.mjs --email ${u.email}`);
+    console.log(`    → reject:   node scripts/db/verify-companion.mjs --email ${u.email} --revoke`);
     console.log('');
   }
 }

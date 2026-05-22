@@ -1,17 +1,13 @@
 import 'server-only';
 
-// Verification flow (new schema).
+// Verification flow.
 //
 // The `users` table carries a single `verification_status` enum:
-// 'unverified' | 'pending' | 'verified'. Companions submit a
-// verification request which moves their users.verification_status from
-// 'unverified' to 'pending'. The transition to 'verified' is reserved
-// for the admin / review path. Until 'verified', RLS hides the
-// companion's profile from discovery (core product rule #10).
-//
-// Seekers don't have a separate verification flow — the same column
-// applies, but companion-specific gating only fires when is_companion
-// is true.
+// 'unverified' | 'pending' | 'verified'. The applicant uploads a
+// government ID + selfie and submits — that flips them to 'pending'.
+// The transition to 'verified' is reserved for the admin / review path
+// (see scripts/db/verify-companion.mjs). Until 'verified', RLS hides
+// the companion profile from /discover (core product rule #10).
 
 import { authServerClient } from './db';
 import type { UserUpdate, VerificationStatus } from '@/lib/types';
@@ -19,14 +15,21 @@ import type { UserUpdate, VerificationStatus } from '@/lib/types';
 export interface CompanionVerificationInput {
   /** Free-text legal name as presented on ID. */
   legalName: string;
-  /** Verification photo path in Supabase Storage (id document). */
+  /** Government-ID photo path in Supabase Storage (verification bucket). */
   documentPath: string;
+  /** Selfie photo path in Supabase Storage (same bucket). */
+  selfiePath: string;
 }
 
 /**
- * Move the signed-in companion's verification status to 'pending'.
- * No-op (and returns success) if already pending/verified - the flow
- * is idempotent so the UI can be safe to retry.
+ * Move the signed-in user's verification status to 'pending'.
+ * No-op (and returns success) if already pending/verified — the flow
+ * is idempotent so the UI can safely retry.
+ *
+ * Drops the prior `is_companion` gate: now that the seeker/companion
+ * mode flag is decommissioned, any signed-in user can request
+ * verification. Anyone with a companion_profiles row + verified status
+ * shows up in /discover; everyone else is just verified-as-a-person.
  */
 export async function submitCompanionVerification(
   input: CompanionVerificationInput,
@@ -35,7 +38,10 @@ export async function submitCompanionVerification(
     return { ok: false, error: 'Legal name is required for verification.' };
   }
   if (!input.documentPath.trim()) {
-    return { ok: false, error: 'A verification document is required.' };
+    return { ok: false, error: 'A photo of your ID is required.' };
+  }
+  if (!input.selfiePath.trim()) {
+    return { ok: false, error: 'A selfie is required.' };
   }
 
   const supabase = await authServerClient();
@@ -44,17 +50,14 @@ export async function submitCompanionVerification(
 
   const { data: rowRaw, error: readErr } = await supabase
     .from('users')
-    .select('verification_status, is_companion')
+    .select('verification_status')
     .eq('id', auth.user.id)
     .maybeSingle();
 
   if (readErr) return { ok: false, error: readErr.message };
-  const row = rowRaw as { verification_status: VerificationStatus; is_companion: boolean } | null;
+  const row = rowRaw as { verification_status: VerificationStatus } | null;
   if (!row) {
     return { ok: false, error: 'Profile not found.' };
-  }
-  if (!row.is_companion) {
-    return { ok: false, error: 'Enable companion mode before requesting verification.' };
   }
   if (row.verification_status === 'verified' || row.verification_status === 'pending') {
     return { ok: true, status: row.verification_status };

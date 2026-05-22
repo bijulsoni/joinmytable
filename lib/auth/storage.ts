@@ -177,6 +177,31 @@ export async function uploadVerificationDocument(
   });
 }
 
+/**
+ * Upload a companion identity-verification selfie. Same private bucket
+ * as the ID document, with a distinctive `selfie-` filename prefix so
+ * the admin review tool can pick the ID and the selfie apart by name.
+ */
+export async function uploadVerificationSelfie(
+  file: Blob,
+): Promise<StorageUploadResult | StorageUploadError> {
+  const supabase = await authServerClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: 'Not signed in.' };
+
+  const ext = mimeToExt(file.type);
+  const objectKey = `${auth.user.id}/selfie-${Date.now()}.${ext}`;
+
+  return uploadBlob({
+    bucket: VERIFICATION_BUCKET,
+    objectKey,
+    file,
+    publicBucket: false,
+    upsert: false,
+    maxBytes: VERIFICATION_MAX_BYTES,
+  });
+}
+
 /** Resolve a public avatar URL for rendering. Returns null when unset. */
 export async function avatarPublicUrl(avatarPath: string | null): Promise<string | null> {
   if (!avatarPath) return null;
