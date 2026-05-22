@@ -8,6 +8,7 @@ import { DetailHeroPhoto } from './DetailHeroPhoto';
 import { getSessionUser } from '@/lib/auth/session';
 import {
   ACTIVITY_TYPE_META,
+  budgetRangeLabel,
   type ActivityType,
   type BudgetTier,
   type RequestStatus,
@@ -164,7 +165,14 @@ export default async function RequestDetailPage(ctx: RouteContext) {
                 {r.venue_location ? <span> · {r.venue_location}</span> : null}
               </DetailRow>
             ) : null}
-            {r.budget_tier ? <DetailRow label="Budget">{r.budget_tier}</DetailRow> : null}
+            {r.budget_tier ? (
+              <DetailRow label="Budget">
+                <strong>{r.budget_tier}</strong>{' '}
+                <span className={styles.budgetRange}>
+                  · {budgetRangeLabel(r.activity_type, r.budget_tier)} per person
+                </span>
+              </DetailRow>
+            ) : null}
             {r.message ? (
               <DetailRow label="Message">
                 <span className={styles.messageQuote}>“{r.message}”</span>

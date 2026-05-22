@@ -54,6 +54,43 @@ export type BudgetTier = '$' | '$$' | '$$$';
 
 export const BUDGET_TIERS: readonly BudgetTier[] = ['$', '$$', '$$$'] as const;
 
+/**
+ * Human-readable per-person budget ranges for the activity bill (the
+ * venue tab — does NOT include the companion fee). Calibrated for US
+ * metros; shown in the request composer so the seeker isn't guessing
+ * what `$$$` means, and on the request/booking row so the companion
+ * sees what to expect.
+ *
+ * Ranges nailed down with the founder; see commit history for the
+ * conversation behind each cell.
+ */
+export const BUDGET_TIER_RANGES: Readonly<Record<ActivityType, Record<BudgetTier, string>>> = {
+  coffee: {
+    $: 'Under $10',
+    $$: '$10–20',
+    $$$: '$20+',
+  },
+  lunch: {
+    $: 'Under $20',
+    $$: '$20–40',
+    $$$: '$40+',
+  },
+  happy_hour: {
+    $: 'Under $25',
+    $$: '$25–50',
+    $$$: '$50+',
+  },
+  dinner: {
+    $: 'Under $30',
+    $$: '$30–60',
+    $$$: '$60+',
+  },
+};
+
+export function budgetRangeLabel(activity: ActivityType, tier: BudgetTier): string {
+  return BUDGET_TIER_RANGES[activity][tier];
+}
+
 // ---------------------------------------------------------------------------
 // Allowed lifecycle transitions
 // ---------------------------------------------------------------------------

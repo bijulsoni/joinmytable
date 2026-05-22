@@ -200,6 +200,12 @@
   color: var(--color-text-secondary);
 }
 
+.budgetRange {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
 .messageQuote {
   font-style: italic;
   color: var(--color-text-secondary);

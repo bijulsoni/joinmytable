@@ -16,7 +16,13 @@ import { useRouter } from 'next/navigation';
 import { Button, Card, Input, Textarea } from '@/components/ui';
 import { ActivityIcon } from '@/components/activity';
 import { StatusMessage } from '@/components/StatusMessage';
-import { ACTIVITY_TYPE_META, BUDGET_TIERS, type ActivityType, type BudgetTier } from '@/lib/types';
+import {
+  ACTIVITY_TYPE_META,
+  BUDGET_TIERS,
+  budgetRangeLabel,
+  type ActivityType,
+  type BudgetTier,
+} from '@/lib/types';
 import styles from './styles.module.css';
 
 interface Props {
@@ -288,7 +294,7 @@ export function RequestComposer({ companionId, companionFirstName, offered, rate
 
           <div className={styles.composerSection}>
             <span className={styles.composerSectionLabel}>
-              Budget tier (your max for the activity bill)
+              Budget tier (your max for the activity bill, per person)
             </span>
             <div className={styles.composerBudgetRow} role="group" aria-label="Budget tier">
               {BUDGET_TIERS.map((tier) => (
@@ -299,7 +305,10 @@ export function RequestComposer({ companionId, companionFirstName, offered, rate
                   aria-pressed={budget === tier}
                   onClick={() => setBudget(tier)}
                 >
-                  {tier}
+                  <span className={styles.composerBudgetSymbol}>{tier}</span>
+                  <span className={styles.composerBudgetRange}>
+                    {budgetRangeLabel(activity, tier)}
+                  </span>
                 </button>
               ))}
             </div>
