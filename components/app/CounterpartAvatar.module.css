@@ -1,0 +1,29 @@
+.avatarButton {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: var(--color-surface-muted);
+  border-radius: 50%;
+  cursor: zoom-in;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+
+.avatarButton:hover {
+  transform: scale(1.06);
+}
+
+.avatarButton:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  display: block;
+}

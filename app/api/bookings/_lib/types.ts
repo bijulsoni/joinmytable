@@ -16,6 +16,8 @@ export interface BookingDTO {
   seeker_id: string;
   companion_id: string;
   counterpart_name: string | null;
+  /** See note on MealRequestDTO.counterpart_photo_urls. */
+  counterpart_photo_urls: string[];
   escrow_status: EscrowStatus | null;
 }
 

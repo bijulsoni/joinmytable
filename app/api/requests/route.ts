@@ -26,6 +26,7 @@ import type { MealRequestDTO, MealRequestRow } from './_lib/types';
 function toDto(
   row: MealRequestRow,
   counterpartName: string | null = null,
+  counterpartPhotoUrls: string[] = [],
   bookingId: string | null = null,
 ): MealRequestDTO {
   return {
@@ -41,8 +42,29 @@ function toDto(
     status: row.status,
     created_at: row.created_at,
     counterpart_name: counterpartName,
+    counterpart_photo_urls: counterpartPhotoUrls,
     booking_id: bookingId,
   };
+}
+
+// Batch-fetch photo_urls for a set of user_ids via service-role.
+// companion_profiles RLS hides non-verified rows from other callers,
+// but we want a seeker's photos to surface on the companion's side
+// of a meal_request and vice versa. The trust boundary is the
+// request itself: if you're in the request, you can see the
+// counterpart's photos.
+async function loadCounterpartPhotos(userIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (userIds.length === 0) return out;
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .from('companion_profiles')
+    .select('user_id, photo_urls')
+    .in('user_id', userIds);
+  for (const r of (data ?? []) as Array<{ user_id: string; photo_urls: string[] | null }>) {
+    out.set(r.user_id, r.photo_urls ?? []);
+  }
+  return out;
 }
 
 export async function POST(request: NextRequest) {
@@ -143,7 +165,11 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json({ request: toDto(row, companion.users.name) }, { status: 201 });
+  const photosByUser = await loadCounterpartPhotos([companion_id]);
+  return NextResponse.json(
+    { request: toDto(row, companion.users.name, photosByUser.get(companion_id) ?? []) },
+    { status: 201 },
+  );
 }
 
 export async function GET(_request: NextRequest) {
@@ -178,13 +204,22 @@ export async function GET(_request: NextRequest) {
     }
   >;
 
+  // Collect counterpart user_ids for the batch photo fetch.
+  const counterpartIds = new Set<string>();
+  for (const row of rows) {
+    const otherId = row.seeker_id === caller.userId ? row.companion_id : row.seeker_id;
+    if (otherId) counterpartIds.add(otherId);
+  }
+  const photosByUser = await loadCounterpartPhotos([...counterpartIds]);
+
   const requests = rows.map((row) => {
     const counterpartName =
       row.seeker_id === caller.userId ? (row.companion?.name ?? null) : (row.seeker?.name ?? null);
+    const counterpartId = row.seeker_id === caller.userId ? row.companion_id : row.seeker_id;
     const bookingId = Array.isArray(row.bookings)
       ? (row.bookings[0]?.id ?? null)
       : (row.bookings?.id ?? null);
-    return toDto(row, counterpartName, bookingId);
+    return toDto(row, counterpartName, photosByUser.get(counterpartId) ?? [], bookingId);
   });
 
   const inbound = requests.filter((r) => r.companion_id === caller.userId);

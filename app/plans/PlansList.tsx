@@ -20,8 +20,9 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Avatar, Badge, Button, Card, EmptyState } from '@/components/ui';
+import { Badge, Button, Card, EmptyState } from '@/components/ui';
 import { StatusMessage } from '@/components/StatusMessage';
+import { CounterpartAvatar } from '@/components/app/CounterpartAvatar';
 import { useChatDock } from '@/lib/chat/dock-context';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import {
@@ -39,6 +40,7 @@ interface BookingListItem {
   scheduled_time: string;
   status: BookingStatus;
   counterpart_name: string | null;
+  counterpart_photo_urls?: string[];
 }
 
 interface RequestListItem {
@@ -50,6 +52,7 @@ interface RequestListItem {
   venue_name: string | null;
   status: RequestStatus;
   counterpart_name: string | null;
+  counterpart_photo_urls?: string[];
   message: string | null;
 }
 
@@ -248,7 +251,11 @@ export function PlansList() {
                     className={styles.pendingRowLink}
                     aria-label={`Open request from ${counterpart}`}
                   >
-                    <Avatar name={counterpart} size={56} />
+                    <CounterpartAvatar
+                      name={counterpart}
+                      photos={r.counterpart_photo_urls ?? []}
+                      size={56}
+                    />
                     <div className={styles.rowMain}>
                       <p className={styles.rowName}>
                         {counterpart} wants to share {meta.label.toLowerCase()}
@@ -303,7 +310,11 @@ export function PlansList() {
                     className={styles.pendingRowLink}
                     aria-label={`Open your request to ${counterpart}`}
                   >
-                    <Avatar name={counterpart} size={56} />
+                    <CounterpartAvatar
+                      name={counterpart}
+                      photos={r.counterpart_photo_urls ?? []}
+                      size={56}
+                    />
                     <div className={styles.rowMain}>
                       <p className={styles.rowName}>Waiting on {counterpart}</p>
                       <p className={styles.rowMeta}>
@@ -334,12 +345,16 @@ export function PlansList() {
               return (
                 <Card key={b.id} shadow>
                   <div className={styles.bookingRow}>
+                    <CounterpartAvatar
+                      name={counterpart}
+                      photos={b.counterpart_photo_urls ?? []}
+                      size={56}
+                    />
                     <Link
                       href={`/plans/by-booking/${b.id}`}
                       className={styles.bookingRowLink}
                       aria-label={`Open plan details with ${counterpart}`}
                     >
-                      <Avatar name={counterpart} size={56} />
                       <div className={styles.rowMain}>
                         <p className={styles.rowName}>{counterpart}</p>
                         <p className={styles.rowMeta}>
@@ -389,7 +404,11 @@ export function PlansList() {
               return (
                 <Card key={b.id} as={Link} href={`/plans/by-booking/${b.id}`}>
                   <div className={styles.row}>
-                    <Avatar name={b.counterpart_name ?? 'A companion'} size={56} />
+                    <CounterpartAvatar
+                      name={b.counterpart_name ?? 'A companion'}
+                      photos={b.counterpart_photo_urls ?? []}
+                      size={56}
+                    />
                     <div className={styles.rowMain}>
                       <p className={styles.rowName}>{b.counterpart_name ?? 'A companion'}</p>
                       <p className={styles.rowMeta}>
@@ -426,7 +445,11 @@ export function PlansList() {
               return (
                 <Card key={r.id} as={Link} href={`/plans/${r.id}`}>
                   <div className={styles.row}>
-                    <Avatar name={r.counterpart_name ?? 'Someone'} size={56} />
+                    <CounterpartAvatar
+                      name={r.counterpart_name ?? 'Someone'}
+                      photos={r.counterpart_photo_urls ?? []}
+                      size={56}
+                    />
                     <div className={styles.rowMain}>
                       <p className={styles.rowName}>{heading}</p>
                       <p className={styles.rowMeta}>

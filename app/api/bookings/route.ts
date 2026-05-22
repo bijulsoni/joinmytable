@@ -41,6 +41,7 @@ function toDto(
   seekerId: string,
   companionId: string,
   counterpartName: string | null,
+  counterpartPhotoUrls: string[],
   escrowStatus: EscrowStatus | null,
 ): BookingDTO {
   return {
@@ -57,8 +58,26 @@ function toDto(
     seeker_id: seekerId,
     companion_id: companionId,
     counterpart_name: counterpartName,
+    counterpart_photo_urls: counterpartPhotoUrls,
     escrow_status: escrowStatus,
   };
+}
+
+// See note in /api/requests on why we fetch counterpart photos via the
+// admin client (service role bypasses the verified-only RLS so the
+// seeker's photos surface to the companion they've booked with).
+async function loadCounterpartPhotos(userIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (userIds.length === 0) return out;
+  const admin = apiAdminClient();
+  const { data } = await admin
+    .from('companion_profiles')
+    .select('user_id, photo_urls')
+    .in('user_id', userIds);
+  for (const r of (data ?? []) as Array<{ user_id: string; photo_urls: string[] | null }>) {
+    out.set(r.user_id, r.photo_urls ?? []);
+  }
+  return out;
 }
 
 export async function POST(request: NextRequest) {
@@ -204,8 +223,18 @@ export async function POST(request: NextRequest) {
     data: { fee, bookingId: booking.id, activityType: req.activity_type },
   });
 
+  const photosByUser = await loadCounterpartPhotos([req.companion_id]);
   return NextResponse.json(
-    { booking: toDto(booking, req.seeker_id, req.companion_id, cp.users.name, 'held') },
+    {
+      booking: toDto(
+        booking,
+        req.seeker_id,
+        req.companion_id,
+        cp.users.name,
+        photosByUser.get(req.companion_id) ?? [],
+        'held',
+      ),
+    },
     { status: 201 },
   );
 }
@@ -235,6 +264,20 @@ export async function GET() {
   }
 
   const rows = (data ?? []) as JoinedListRow[];
+
+  // Batch-fetch counterpart photos so the list view can render real
+  // thumbnails (and a clickable gallery) instead of initials placeholders.
+  const counterpartIds = new Set<string>();
+  for (const row of rows) {
+    if (!row.meal_requests) continue;
+    const otherId =
+      row.meal_requests.seeker_id === caller.userId
+        ? row.meal_requests.companion_id
+        : row.meal_requests.seeker_id;
+    if (otherId) counterpartIds.add(otherId);
+  }
+  const photosByUser = await loadCounterpartPhotos([...counterpartIds]);
+
   const bookings = rows
     .filter((row) => row.meal_requests !== null)
     .map((row) => {
@@ -244,8 +287,16 @@ export async function GET() {
         seekerId === caller.userId
           ? (row.meal_requests!.companion?.name ?? null)
           : (row.meal_requests!.seeker?.name ?? null);
+      const counterpartId = seekerId === caller.userId ? companionId : seekerId;
       const escrowStatus = (row.payments?.[0]?.escrow_status ?? null) as EscrowStatus | null;
-      return toDto(row, seekerId, companionId, counterpartName, escrowStatus);
+      return toDto(
+        row,
+        seekerId,
+        companionId,
+        counterpartName,
+        photosByUser.get(counterpartId) ?? [],
+        escrowStatus,
+      );
     });
 
   return NextResponse.json({ bookings });

@@ -15,7 +15,7 @@
 
 import { type ReactNode, useState } from 'react';
 import { Avatar } from '@/components/ui';
-import { PhotoLightbox } from './PhotoLightbox';
+import { PhotoLightbox } from '@/components/photo/PhotoLightbox';
 import styles from './styles.module.css';
 
 interface Props {
