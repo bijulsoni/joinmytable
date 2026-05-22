@@ -24,7 +24,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   }
   const id = idResult.data;
 
-  const { data, error } = await caller.supabase
+  // Admin client because the seeker:users join would otherwise be
+  // hidden by the users RLS (only verified companions are public). We
+  // re-check participation explicitly below so a non-participant still
+  // gets 404 — bypass is only for the join visibility.
+  const admin = apiAdminClient();
+  const { data, error } = await admin
     .from('bookings')
     .select(
       `*,
@@ -59,6 +64,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!row.meal_requests) {
     return apiError('not_found', 'Booking is missing its request linkage.');
   }
+
+  // Explicit participant gate (compensating for the admin-client SELECT).
+  if (
+    row.meal_requests.seeker_id !== caller.userId &&
+    row.meal_requests.companion_id !== caller.userId
+  ) {
+    return apiError('not_found', 'Booking not found.');
+  }
   const seekerId = row.meal_requests.seeker_id;
   const companionId = row.meal_requests.companion_id;
   const counterpartName =
@@ -70,12 +83,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
   const callerRole: 'seeker' | 'companion' = seekerId === caller.userId ? 'seeker' : 'companion';
 
-  // Pull counterpart's photo gallery via service-role (the seeker's
-  // companion_profiles row is typically unverified and hidden by RLS,
-  // but the booking participation is enough trust for the detail view).
+  // Reuse the admin client from above for the photo gallery lookup.
   let counterpartPhotoUrls: string[] = [];
   if (counterpartId) {
-    const admin = apiAdminClient();
     const { data: cpRaw } = await admin
       .from('companion_profiles')
       .select('photo_urls')

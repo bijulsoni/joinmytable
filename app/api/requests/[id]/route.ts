@@ -38,8 +38,14 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   if (!idResult.success) return apiError('invalid_input', 'Invalid request id.');
   const id = idResult.data;
 
-  // RLS filters to (seeker_id = me OR companion_id = me).
-  const { data: reqRaw, error: reqErr } = await caller.supabase
+  // We use the admin client here on purpose. RLS on public.users hides
+  // non-verified-companion rows from other users — which means when a
+  // companion views a request from a seeker (the common case), the
+  // joined `seeker:users` row comes back null and we lose the seeker's
+  // name + id. We do the participant check explicitly below, so this
+  // is safe: a non-participant still hits not_found.
+  const admin = apiAdminClient();
+  const { data: reqRaw, error: reqErr } = await admin
     .from('meal_requests')
     .select(
       `*,
@@ -57,6 +63,12 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     companion: { id: string; name: string | null; email: string | null } | null;
     bookings: Array<{ id: string }> | { id: string } | null;
   };
+
+  // Participant gate (would normally be enforced by RLS, but we
+  // bypassed it with the admin client above).
+  if (row.seeker_id !== caller.userId && row.companion_id !== caller.userId) {
+    return apiError('not_found', 'Request not found.');
+  }
 
   const callerRole: 'seeker' | 'companion' =
     row.seeker_id === caller.userId ? 'seeker' : 'companion';
@@ -81,10 +93,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   } | null = null;
 
   if (counterpartId) {
-    // Admin so we can see profiles even before the counterpart is
-    // verified (rarely matters since the seeker only requests verified
-    // companions, but the seeker may be unverified themselves).
-    const admin = apiAdminClient();
+    // Reuse the admin client from above — same trust boundary.
     const { data: cpRaw } = await admin
       .from('companion_profiles')
       .select('bio, service_area, photo_urls, rating_avg, verified_at, activities, rates')
