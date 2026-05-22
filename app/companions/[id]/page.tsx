@@ -2,11 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { Avatar, EmptyState } from '@/components/ui';
+import { EmptyState } from '@/components/ui';
 import { StatusMessage } from '@/components/StatusMessage';
 import { AppShell } from '@/components/app';
 import { getSessionUser } from '@/lib/auth/session';
 import { RequestComposer } from './RequestComposer';
+import { ProfilePhotoSurface } from './ProfilePhotoSurface';
 import { ACTIVITY_TYPES } from '@/lib/types';
 import type { PublicCompanionProfileDTO } from '@/app/api/profiles/_lib/types';
 import styles from './styles.module.css';
@@ -90,10 +91,7 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
     notFound();
   }
 
-  const headerPhoto = profile.photo_urls[0] ?? null;
   const offered = ACTIVITY_TYPES.filter((a) => profile.activities[a]);
-
-  const additionalPhotos = profile.photo_urls.slice(1);
 
   return (
     <AppShell loginRedirectTo={`/companions/${id}`}>
@@ -104,47 +102,30 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
           </Link>
         </div>
 
-        <section className={styles.heroCard}>
-          {headerPhoto ? (
-            <div className={styles.heroPhoto}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={headerPhoto} alt={`${profile.name}'s photo`} />
-            </div>
-          ) : (
-            <div className={styles.heroPhotoFallback} aria-hidden>
-              <Avatar src={null} name={profile.name} size={72} />
-            </div>
-          )}
-          <div className={styles.heroInfo}>
-            <div className={styles.nameRow}>
-              <h1 className={styles.name}>{profile.name}</h1>
-              <span className={styles.verified}>
-                <span aria-hidden>✓</span> Verified
-              </span>
-            </div>
-            <div className={styles.metaRow}>
-              <span className={styles.metaRating}>
-                <span aria-hidden>★</span> {Number(profile.rating_avg).toFixed(1)}
-              </span>
-              {profile.service_area ? (
-                <span className={styles.metaArea}>
-                  <span aria-hidden>📍</span> {profile.service_area}
+        <ProfilePhotoSurface
+          photos={profile.photo_urls}
+          name={profile.name}
+          meta={
+            <div className={styles.heroInfo}>
+              <div className={styles.nameRow}>
+                <h1 className={styles.name}>{profile.name}</h1>
+                <span className={styles.verified}>
+                  <span aria-hidden>✓</span> Verified
                 </span>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        {additionalPhotos.length > 0 ? (
-          <section className={styles.gallery} aria-label="More photos">
-            {additionalPhotos.map((url) => (
-              <div key={url} className={styles.galleryTile}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" />
               </div>
-            ))}
-          </section>
-        ) : null}
+              <div className={styles.metaRow}>
+                <span className={styles.metaRating}>
+                  <span aria-hidden>★</span> {Number(profile.rating_avg).toFixed(1)}
+                </span>
+                {profile.service_area ? (
+                  <span className={styles.metaArea}>
+                    <span aria-hidden>📍</span> {profile.service_area}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          }
+        />
 
         <section className={styles.section} aria-labelledby="activities-heading">
           <h2 id="activities-heading" className={styles.sectionHeading}>
