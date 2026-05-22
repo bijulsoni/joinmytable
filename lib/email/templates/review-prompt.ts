@@ -24,7 +24,7 @@ export const reviewPromptTemplate: EmailTemplate<ReviewPromptData> = (data): Ema
   const ctaHref = appUrl(`/bookings/${data.bookingId}/review`);
 
   const html = layout({
-    preheader: 'A quick review keeps JoinMyTable warm and trusted.',
+    preheader: 'A quick review keeps Konnly warm and trusted.',
     heading: 'Tell us how it went',
     bodyHtml: `
       <p>Hi ${escapeHtml(data.recipientName)},</p>

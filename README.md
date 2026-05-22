@@ -1,4 +1,4 @@
-# JoinMyTable
+# Konnly
 
 A two-sided marketplace for **lunch and dinner companionship**. Seekers pay a fixed fee to share a meal with a companion; companions earn the fee plus a free meal.
 
@@ -10,16 +10,16 @@ The MVP is a **mobile-first responsive website** built on Next.js (App Router) +
 
 ## Tech stack
 
-| Layer        | Choice                                                          |
-| ------------ | --------------------------------------------------------------- |
-| Frontend     | Next.js 14 (App Router), TypeScript, React 18                   |
-| Backend      | Next.js Route Handlers (same codebase, deployed on Vercel)      |
-| Database     | Supabase (PostgreSQL + PostGIS, Auth, Realtime, Storage)        |
-| Payments     | Stripe Connect (Elements on the client; webhooks on the server) |
-| Maps         | Google Maps **or** Mapbox (wrapped behind `lib/maps`)           |
-| Email        | Resend (wrapped behind `lib/email`)                             |
-| Tests        | Vitest                                                          |
-| Observability| pino + Sentry                                                   |
+| Layer         | Choice                                                          |
+| ------------- | --------------------------------------------------------------- |
+| Frontend      | Next.js 14 (App Router), TypeScript, React 18                   |
+| Backend       | Next.js Route Handlers (same codebase, deployed on Vercel)      |
+| Database      | Supabase (PostgreSQL + PostGIS, Auth, Realtime, Storage)        |
+| Payments      | Stripe Connect (Elements on the client; webhooks on the server) |
+| Maps          | Google Maps **or** Mapbox (wrapped behind `lib/maps`)           |
+| Email         | Resend (wrapped behind `lib/email`)                             |
+| Tests         | Vitest                                                          |
+| Observability | pino + Sentry                                                   |
 
 ---
 
@@ -72,29 +72,29 @@ The hook runs `lint-staged` (ESLint + Prettier on staged files) and `npm run typ
 
 ## Commands
 
-| Command              | Purpose                                                  |
-| -------------------- | -------------------------------------------------------- |
-| `npm run dev`        | Local development server                                 |
-| `npm run build`      | Production build                                         |
-| `npm run start`      | Run the production build locally                         |
-| `npm run lint`       | ESLint (Next.js + TypeScript rules, Prettier-aware)      |
-| `npm run format`     | Prettier write                                           |
-| `npm run format:check` | Prettier check (CI mode)                               |
-| `npm run type-check` | `tsc --noEmit`                                           |
-| `npm run test`       | Vitest (single run)                                      |
-| `npm run test:watch` | Vitest in watch mode                                     |
-| `npm run db:migrate` | Apply DB migrations *(Database agent wires this up)*     |
-| `npm run db:seed`    | Load seed data *(Database agent wires this up)*          |
+| Command                | Purpose                                              |
+| ---------------------- | ---------------------------------------------------- |
+| `npm run dev`          | Local development server                             |
+| `npm run build`        | Production build                                     |
+| `npm run start`        | Run the production build locally                     |
+| `npm run lint`         | ESLint (Next.js + TypeScript rules, Prettier-aware)  |
+| `npm run format`       | Prettier write                                       |
+| `npm run format:check` | Prettier check (CI mode)                             |
+| `npm run type-check`   | `tsc --noEmit`                                       |
+| `npm run test`         | Vitest (single run)                                  |
+| `npm run test:watch`   | Vitest in watch mode                                 |
+| `npm run db:migrate`   | Apply DB migrations _(Database agent wires this up)_ |
+| `npm run db:seed`      | Load seed data _(Database agent wires this up)_      |
 
 ---
 
 ## Environments
 
-| Environment | Purpose                                  | Deploy            |
-| ----------- | ---------------------------------------- | ----------------- |
-| development | Each developer's local                   | Local             |
-| staging     | Shared integration target                | Auto from `main`  |
-| production  | Live site                                | Manual promote    |
+| Environment | Purpose                   | Deploy           |
+| ----------- | ------------------------- | ---------------- |
+| development | Each developer's local    | Local            |
+| staging     | Shared integration target | Auto from `main` |
+| production  | Live site                 | Manual promote   |
 
 Each environment maps to its own **Supabase project** and **set of secrets** in Vercel. See `.env.example` for every key any agent might need.
 
@@ -124,11 +124,11 @@ A red CI blocks merge.
 
 ## Working as an agent
 
-If you are one of the JoinMyTable agents (Foundations, Database, Auth & Identity, Core API, Payments, Frontend, Integrations, QA & Testing, Trust & Safety):
+If you are one of the Konnly agents (Foundations, Database, Auth & Identity, Core API, Payments, Frontend, Integrations, QA & Testing, Trust & Safety):
 
 1. Read [`CLAUDE.md`](./CLAUDE.md) — your **scope**, **tasks**, and **definition of done** are there.
 2. Build only against **frozen contracts**. Coordinate cross-area changes through the Orchestrator.
 3. Respect the **core product rules**. They are invariants.
 4. Keep PRs small and scoped to your owned area.
 
-See also: `JoinMyTable-Multi-Agent-Execution-Plan.md` for the full dependency graph and phase gates.
+See also: `Konnly-Multi-Agent-Execution-Plan.md` for the full dependency graph and phase gates.

@@ -4,7 +4,7 @@ import { PlansList } from './PlansList';
 
 export const metadata: Metadata = {
   title: 'Plans',
-  description: 'Your upcoming and past JoinMyTable plans.',
+  description: 'Your upcoming and past Konnly plans.',
 };
 
 // Unified inbox: pending inbound requests, pending outbound requests,

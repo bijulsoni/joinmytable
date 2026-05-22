@@ -6,7 +6,7 @@ import { WelcomeForm } from './WelcomeForm';
 import styles from './styles.module.css';
 
 export const metadata: Metadata = {
-  title: 'Welcome to JoinMyTable',
+  title: 'Welcome to Konnly',
   description: 'Add a few photos, a bio, and (optionally) list yourself as a paid companion.',
 };
 
@@ -39,7 +39,7 @@ export default async function WelcomePage() {
     <AppShell loginRedirectTo="/welcome">
       <main className={styles.shell}>
         <header className={styles.header}>
-          <p className={styles.eyebrow}>Welcome to JoinMyTable</p>
+          <p className={styles.eyebrow}>Welcome to Konnly</p>
           <h1 className={styles.heading}>
             A little about <span className={styles.headingAccent}>you</span>
           </h1>

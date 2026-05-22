@@ -7,8 +7,8 @@
 import { ACTIVITY_TYPE_META, type ActivityType } from '@/lib/types';
 
 /** Brand + link constants. Imported by every template. */
-export const BRAND = 'JoinMyTable';
-export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://joinmytable.co';
+export const BRAND = 'Konnly';
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://konnly.co';
 
 /** Shape every template returns to `sendEmail`. */
 export interface EmailContent {

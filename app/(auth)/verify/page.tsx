@@ -23,7 +23,7 @@ export default async function VerifyPage() {
     <div className={styles.card}>
       <h1 className={styles.heading}>Identity & verification</h1>
       <p className={styles.subheading}>
-        Hi {profile?.name ?? user.email}. Finish these steps to get the most out of JoinMyTable.
+        Hi {profile?.name ?? user.email}. Finish these steps to get the most out of Konnly.
       </p>
 
       {/* Email confirmation status */}

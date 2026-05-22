@@ -5,7 +5,7 @@ import styles from './styles.module.css';
 export const metadata: Metadata = {
   title: 'Safety & community',
   description:
-    'How JoinMyTable keeps coffee, lunch, happy hour, and dinner meetings safe — public venues only, verified companions, in-app messaging, and held escrow.',
+    'How Konnly keeps coffee, lunch, happy hour, and dinner meetings safe — public venues only, verified companions, in-app messaging, and held escrow.',
 };
 
 // Public-facing safety + community page. Linked from the landing footer.
@@ -18,7 +18,7 @@ export default function SafetyPage() {
       <header className={styles.header}>
         <Link href="/" className={styles.wordmark}>
           <span className={styles.wordmarkMark}>◖</span>
-          JoinMyTable
+          Konnly
         </Link>
       </header>
 
@@ -26,8 +26,8 @@ export default function SafetyPage() {
         <p className={styles.eyebrow}>Safety & community</p>
         <h1 className={styles.title}>Built around a shared table — and around safety.</h1>
         <p className={styles.lede}>
-          JoinMyTable is a marketplace for shared activities in public venues. Every safeguard here
-          is enforced by the product, not by good intentions.
+          Konnly is a marketplace for shared activities in public venues. Every safeguard here is
+          enforced by the product, not by good intentions.
         </p>
 
         <section className={styles.section}>
@@ -50,9 +50,9 @@ export default function SafetyPage() {
         <section className={styles.section}>
           <h2 className={styles.h2}>In-app messaging until booked</h2>
           <p>
-            Chat unlocks only after a request is accepted, and stays inside JoinMyTable. Contact
-            details, payment apps, and outside platforms stay off the conversation until both sides
-            choose to share them.
+            Chat unlocks only after a request is accepted, and stays inside Konnly. Contact details,
+            payment apps, and outside platforms stay off the conversation until both sides choose to
+            share them.
           </p>
         </section>
 
@@ -61,7 +61,7 @@ export default function SafetyPage() {
           <p>
             The companionship fee is charged at booking and held in escrow. It only releases to your
             companion after the activity is marked complete. If you cancel, the fee is refunded.
-            Card data goes directly to Stripe — JoinMyTable&apos;s servers never see it.
+            Card data goes directly to Stripe — Konnly&apos;s servers never see it.
           </p>
         </section>
 
@@ -78,13 +78,13 @@ export default function SafetyPage() {
           <p>
             Report, block, and &quot;share my meal details with a friend&quot; are landing in our
             next phase. If you ever feel unsafe during an activity, leave the venue and reach out at{' '}
-            <a href="mailto:hello@joinmytable.co">hello@joinmytable.co</a>.
+            <a href="mailto:hello@konnly.co">hello@konnly.co</a>.
           </p>
         </section>
 
         <div className={styles.cta}>
           <Link href="/" className={styles.ctaLink}>
-            ‹ Back to JoinMyTable
+            ‹ Back to Konnly
           </Link>
         </div>
       </article>

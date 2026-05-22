@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 
-// JoinMyTable test harness.
+// Konnly test harness.
 //
 // Owner: QA & Testing agent.
 //

@@ -10,9 +10,9 @@ import { RotatingActivity } from './RotatingActivity';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
-  title: 'JoinMyTable — Never lunch alone again',
+  title: 'Konnly — Real plans with real people',
   description:
-    'A friendly, verified companion for coffee, lunch, happy hour, or dinner — at a public venue you both pick.',
+    'Konnly connects you with friendly, verified people for real-life plans. Today: coffee, lunch, happy hour, dinner. More activities on the way.',
 };
 
 const ACTIVITY_COPY: Record<ActivityType, string> = {
@@ -33,7 +33,7 @@ export default async function HomePage() {
       <header className={styles.topbar}>
         <Link href="/" className={styles.wordmark}>
           <span className={styles.wordmarkMark}>◖</span>
-          JoinMyTable
+          Konnly
         </Link>
         <Link href="/login" className={styles.topbarLogin}>
           Sign in
@@ -44,8 +44,9 @@ export default async function HomePage() {
         <RotatingActivity />
 
         <p className={styles.lede}>
-          A friendly, verified companion for a coffee, lunch, happy hour, or dinner — at a public
-          venue you both pick. You cover the bill and a flat fee. They show up and make it better.
+          Konnly is real plans with real people. Pick a coffee, lunch, happy hour, or dinner. We
+          match you with a friendly, verified companion who&apos;s up for it. You cover the bill
+          plus a flat fee — they show up and make it better.
         </p>
 
         <div className={styles.ctaRow}>
@@ -64,13 +65,13 @@ export default async function HomePage() {
             <span />
             <span />
           </span>
-          Four activities. One warm table. Public venues only.
+          Four activities today. More on the way. Public venues only.
         </p>
       </section>
 
       <section className={styles.activities} aria-labelledby="activities-heading">
         <h2 id="activities-heading" className={styles.activitiesHeading}>
-          Four ways to share a table
+          Four ways to start
         </h2>
         <ul className={styles.activityList}>
           {(['coffee', 'lunch', 'happy_hour', 'dinner'] as const).map((activity) => {

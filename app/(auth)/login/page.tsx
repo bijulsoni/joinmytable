@@ -6,7 +6,7 @@ import styles from '../styles.module.css';
 
 export const metadata: Metadata = {
   title: 'Sign in',
-  description: 'Sign in to JoinMyTable.',
+  description: 'Sign in to Konnly.',
 };
 
 export default async function LoginPage() {

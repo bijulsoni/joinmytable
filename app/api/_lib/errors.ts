@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 // Shared API error envelope.
 //
-// Every JoinMyTable API route returns either a 2xx success body (shape
+// Every Konnly API route returns either a 2xx success body (shape
 // documented per-endpoint in the module's CONTRACT.md) or this envelope.
 //
 // `code` is a stable machine-readable string the Frontend can switch on;

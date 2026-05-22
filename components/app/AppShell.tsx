@@ -76,7 +76,7 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
           <div className={styles.headerInner}>
             <Link href="/discover" className={styles.wordmark}>
               <span className={styles.wordmarkMark}>◖</span>
-              JoinMyTable
+              Konnly
             </Link>
             <nav className={styles.nav} aria-label="Primary">
               <Link href="/discover" className={styles.navLink}>

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Operational context for building **JoinMyTable** with a team of specialized agents running
+Operational context for building **Konnly** with a team of specialized agents running
 directly via the Claude Code CLI. This file is the authoritative reference while building.
 Every agent reads this file first before doing any work.
 
@@ -8,7 +8,7 @@ Every agent reads this file first before doing any work.
 
 ## Project overview
 
-JoinMyTable is a two-sided marketplace for **shared-activity companionship** — lunch,
+Konnly is a two-sided marketplace for **shared-activity companionship** — lunch,
 dinner, coffee/tea, and happy hour. Seekers pay a fixed fee to share an activity with a
 companion; companions earn the fee plus the activity (free meal, coffee, or drinks).
 The MVP is a **mobile-first responsive website** that expands to a native app later.
@@ -312,7 +312,7 @@ See `agents/RUNBOOK.md` for the exact sequence and dependency rules.
 
 ## Open decisions — escalate to founder before Phase 4
 
-- Platform fee % (what cut does JoinMyTable take?)
+- Platform fee % (what cut does Konnly take?)
 - Cancellation policy (how late? any penalty?)
 - Escrow release trigger (both tap done? time-based?)
 - Companion verification method (ID upload? video selfie?)

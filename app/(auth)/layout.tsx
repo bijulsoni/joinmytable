@@ -12,7 +12,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <header className={styles.shellTopbar}>
         <Link href="/" className={styles.wordmark}>
           <span className={styles.wordmarkMark}>◖</span>
-          JoinMyTable
+          Konnly
         </Link>
       </header>
       <main className={styles.shellMain}>

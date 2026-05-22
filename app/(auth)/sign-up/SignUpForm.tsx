@@ -87,7 +87,7 @@ export function SignUpForm() {
           style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
         />
         <p className={styles.helpText}>
-          JoinMyTable is in private beta. Ask whoever invited you for a code.
+          Konnly is in private beta. Ask whoever invited you for a code.
         </p>
       </div>
 

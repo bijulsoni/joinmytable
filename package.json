@@ -1,8 +1,8 @@
 {
-  "name": "joinmytable",
+  "name": "konnly",
   "version": "0.1.0",
   "private": true,
-  "description": "JoinMyTable - a two-sided marketplace for lunch and dinner companionship.",
+  "description": "Konnly — real plans with real people. A two-sided marketplace for shared-activity companionship (coffee, lunch, happy hour, dinner today; more on the way).",
   "engines": {
     "node": ">=20.0.0"
   },

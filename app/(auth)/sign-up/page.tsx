@@ -6,7 +6,7 @@ import styles from '../styles.module.css';
 
 export const metadata: Metadata = {
   title: 'Create your account',
-  description: 'Sign up for JoinMyTable to share a lunch or dinner.',
+  description: 'Sign up for Konnly to share a lunch or dinner.',
 };
 
 // Sign-up - "screen 1" in the wireframe. Email + password, mode select,
@@ -20,9 +20,7 @@ export default async function SignUpPage() {
   return (
     <div className={styles.card}>
       <h1 className={styles.heading}>Create your account</h1>
-      <p className={styles.subheading}>
-        Pick how you&apos;d like to use JoinMyTable. You can do both.
-      </p>
+      <p className={styles.subheading}>Pick how you&apos;d like to use Konnly. You can do both.</p>
       <SignUpForm />
     </div>
   );

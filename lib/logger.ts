@@ -18,7 +18,7 @@ export const logger: Logger = pino({
   level,
   base: {
     env: appEnv,
-    service: 'joinmytable',
+    service: 'konnly',
   },
   redact: {
     paths: [

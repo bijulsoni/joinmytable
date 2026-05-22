@@ -1,4 +1,4 @@
-# Deploy guide — JoinMyTable closed beta
+# Deploy guide — Konnly closed beta
 
 Step-by-step instructions to take the app from local dev to a public
 URL with invite-gated sign-ups. Total time: **~60–90 minutes**.
@@ -37,7 +37,7 @@ Accounts you'll need:
 1. Sign in at https://supabase.com/dashboard
 2. Click **New project**
 3. Settings:
-   - **Name:** `joinmytable-prod`
+   - **Name:** `konnly-prod`
    - **Database password:** generate a strong one and **paste it into your
      password manager** — you cannot retrieve it later, and we need it
      for migrations
@@ -113,7 +113,7 @@ sign-ups.
 
 1. Sign up at https://sentry.io and create a new project
    - Platform: **Next.js**
-   - Name: `joinmytable`
+   - Name: `konnly`
 2. Copy the DSN it gives you. Looks like `https://abc123@o123.ingest.sentry.io/456`
 3. Add to `.env.production.local`:
    ```
@@ -131,7 +131,7 @@ out-of-the-box).
 
 1. Push the current branch to GitHub if you haven't (already done).
 2. Go to https://vercel.com/new
-3. **Import Git Repository** → pick `bijulsoni/joinmytable`
+3. **Import Git Repository** → pick `bijulsoni/konnly`
 4. Project settings:
    - **Framework Preset:** Next.js (auto-detected)
    - **Build Command:** `next build` (default)
@@ -146,7 +146,7 @@ out-of-the-box).
 The first deploy takes ~3 minutes. Watch the build logs for type errors
 or missing env vars.
 
-When it's green, you'll get a URL like `joinmytable-xxx.vercel.app`.
+When it's green, you'll get a URL like `konnly-xxx.vercel.app`.
 **Open it. You should see the landing page.**
 
 ---
@@ -194,8 +194,8 @@ node scripts/db/mint-invite-codes.mjs --count 1 --max-uses 100 --note "twitter"
 
 Skip for first deploy. When ready:
 
-1. Buy a domain (`joinmytable.app`, `.io`, `.cafe` — your call)
-2. In Vercel → Settings → Domains → Add `joinmytable.app`
+1. Buy a domain (`konnly.app`, `.io`, `.cafe` — your call)
+2. In Vercel → Settings → Domains → Add `konnly.app`
 3. Vercel gives you DNS records to set. Add them at your registrar.
 4. SSL provisions automatically within a few minutes.
 

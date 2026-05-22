@@ -20,12 +20,12 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'JoinMyTable — Never lunch alone again',
-    template: '%s | JoinMyTable',
+    default: 'Konnly — Real plans with real people',
+    template: '%s | Konnly',
   },
   description:
-    'Share a meal, a coffee, a drink. JoinMyTable matches you with a verified companion for coffee, lunch, happy hour, or dinner.',
-  applicationName: 'JoinMyTable',
+    'Konnly connects you with friendly, verified people for real-life plans. Today: coffee, lunch, happy hour, dinner. More activities on the way.',
+  applicationName: 'Konnly',
   formatDetection: {
     telephone: false,
   },

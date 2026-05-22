@@ -31,7 +31,7 @@ export const resend = (() => {
   }
 })() as Resend | null;
 
-export const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'hello@joinmytable.co';
+export const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'hello@konnly.co';
 
 /** True only when the Resend API key is configured. */
 export function isEmailConfigured(): boolean {

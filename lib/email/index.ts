@@ -12,9 +12,9 @@
 //                       so booking flows are never broken by missing
 //                       email config.
 //   RESEND_FROM_EMAIL   (optional) Outbound From address. Defaults to
-//                       `hello@joinmytable.co`.
+//                       `hello@konnly.co`.
 //   NEXT_PUBLIC_APP_URL (optional) Used inside templates to build CTA
-//                       links. Defaults to `https://joinmytable.co`.
+//                       links. Defaults to `https://konnly.co`.
 //
 // Exports
 //   client.ts          resend, FROM_EMAIL, isEmailConfigured

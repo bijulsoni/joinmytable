@@ -32,7 +32,7 @@ export const bookingCompletedTemplate: EmailTemplate<BookingCompletedData> = (
     bodyHtml: `
       <p>Hi ${escapeHtml(data.recipientName)},</p>
       <p>Your ${activityLabel(data.activityType).toLowerCase()} with <strong>${escapeHtml(data.otherPartyName)}</strong> is marked complete.</p>
-      <p>Reviews are two-way and help everyone on JoinMyTable choose great companions. It only takes a moment.</p>
+      <p>Reviews are two-way and help everyone on Konnly choose great companions. It only takes a moment.</p>
     `,
     ctaLabel: 'Leave a review',
     ctaHref,
@@ -42,7 +42,7 @@ export const bookingCompletedTemplate: EmailTemplate<BookingCompletedData> = (
     [
       `Hi ${data.recipientName},`,
       `Your ${activityLabel(data.activityType).toLowerCase()} with ${data.otherPartyName} is marked complete.`,
-      'Reviews are two-way and help everyone on JoinMyTable choose great companions.',
+      'Reviews are two-way and help everyone on Konnly choose great companions.',
     ],
     { label: 'Leave a review', href: ctaHref },
   );
