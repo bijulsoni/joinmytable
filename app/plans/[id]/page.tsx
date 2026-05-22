@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { AppShell } from '@/components/app';
-import { Avatar, Badge, EmptyState } from '@/components/ui';
+import { Badge, EmptyState } from '@/components/ui';
+import { DetailHeroPhoto } from './DetailHeroPhoto';
 import { getSessionUser } from '@/lib/auth/session';
 import {
   ACTIVITY_TYPE_META,
@@ -40,6 +41,7 @@ interface RequestDetailResponse {
     user_id: string | null;
     name: string | null;
     photo_url: string | null;
+    photo_urls: string[];
     bio: string | null;
     service_area: string | null;
     rating_avg: number | null;
@@ -122,18 +124,10 @@ export default async function RequestDetailPage(ctx: RouteContext) {
         </header>
 
         <section className={styles.profileCard}>
-          {counterpart.photo_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={counterpart.photo_url}
-              alt={counterpart.name ?? ''}
-              className={styles.photo}
-            />
-          ) : (
-            <div className={styles.photoFallback}>
-              <Avatar name={counterpart.name ?? 'Someone'} size={120} />
-            </div>
-          )}
+          <DetailHeroPhoto
+            name={counterpart.name ?? 'Someone'}
+            photos={counterpart.photo_urls ?? []}
+          />
           <div className={styles.profileMeta}>
             <span className={styles.profileLabel}>{counterpartLabel}</span>
             <h1 className={styles.profileName}>{counterpart.name ?? 'Someone'}</h1>

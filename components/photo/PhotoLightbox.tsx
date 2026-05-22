@@ -81,6 +81,11 @@ export function PhotoLightbox({ photos, alt, initialIndex, onClose }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label={`${alt} — photo ${index + 1} of ${photos.length}`}
+      // Stop bubbling so clicks inside the lightbox (close button,
+      // scrim, arrows) don't propagate up to any Link the avatar may
+      // be nested under and navigate the user away from the list.
+      onClick={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
     >
       {/* Click-outside-image catcher. Sits behind the image; clicking
           the image itself doesn't bubble here. */}

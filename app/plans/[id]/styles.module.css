@@ -42,13 +42,34 @@
   align-items: center;
 }
 
+.photoButton {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+
+.photoButton:hover {
+  transform: scale(1.03);
+}
+
+.photoButton:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .photo {
   width: 96px;
   height: 96px;
   border-radius: var(--radius-lg);
   object-fit: cover;
+  object-position: center 30%;
   border: 1px solid var(--color-border);
-  flex-shrink: 0;
+  display: block;
 }
 
 .photoFallback {

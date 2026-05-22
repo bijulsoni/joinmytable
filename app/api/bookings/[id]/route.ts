@@ -7,7 +7,7 @@ import 'server-only';
 // counterpart name; the chat UI is a separate endpoint.
 
 import { NextResponse } from 'next/server';
-import { apiError, requireAuth } from '@/app/api/_lib';
+import { apiAdminClient, apiError, requireAuth } from '@/app/api/_lib';
 import { uuidSchema } from '@/app/api/_lib/validators';
 import type { BookingRow } from '../_lib/types';
 import type { EscrowStatus } from '@/lib/types';
@@ -65,9 +65,25 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     seekerId === caller.userId
       ? (row.meal_requests.companion?.name ?? null)
       : (row.meal_requests.seeker?.name ?? null);
+  const counterpartId = seekerId === caller.userId ? companionId : seekerId;
   const escrowStatus = row.payments?.[0]?.escrow_status ?? null;
 
   const callerRole: 'seeker' | 'companion' = seekerId === caller.userId ? 'seeker' : 'companion';
+
+  // Pull counterpart's photo gallery via service-role (the seeker's
+  // companion_profiles row is typically unverified and hidden by RLS,
+  // but the booking participation is enough trust for the detail view).
+  let counterpartPhotoUrls: string[] = [];
+  if (counterpartId) {
+    const admin = apiAdminClient();
+    const { data: cpRaw } = await admin
+      .from('companion_profiles')
+      .select('photo_urls')
+      .eq('user_id', counterpartId)
+      .maybeSingle();
+    const cp = cpRaw as { photo_urls: string[] | null } | null;
+    counterpartPhotoUrls = cp?.photo_urls ?? [];
+  }
 
   return NextResponse.json({
     booking: {
@@ -84,6 +100,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       seeker_id: seekerId,
       companion_id: companionId,
       counterpart_name: counterpartName,
+      counterpart_photo_urls: counterpartPhotoUrls,
       caller_role: callerRole,
       escrow_status: escrowStatus,
     },

@@ -71,6 +71,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   // us bio, photo, rating, service area for the detail page.
   let counterpartProfile: {
     photo_url: string | null;
+    photo_urls: string[];
     bio: string | null;
     service_area: string | null;
     rating_avg: number | null;
@@ -107,6 +108,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       }
       counterpartProfile = {
         photo_url: cp.photo_urls?.[0] ?? null,
+        photo_urls: cp.photo_urls ?? [],
         bio: cp.bio,
         service_area: cp.service_area,
         rating_avg: cp.rating_avg === null ? null : Number(cp.rating_avg),
@@ -136,6 +138,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       name: counterpartName,
       ...(counterpartProfile ?? {
         photo_url: null,
+        photo_urls: [],
         bio: null,
         service_area: null,
         rating_avg: null,
