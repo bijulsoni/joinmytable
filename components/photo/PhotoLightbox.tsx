@@ -81,10 +81,24 @@ export function PhotoLightbox({ photos, alt, initialIndex, onClose }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label={`${alt} — photo ${index + 1} of ${photos.length}`}
-      // Stop bubbling so clicks inside the lightbox (close button,
-      // scrim, arrows) don't propagate up to any Link the avatar may
-      // be nested under and navigate the user away from the list.
-      onClick={(e) => e.stopPropagation()}
+      // Stop the click from leaking to any ancestor — most importantly,
+      // the Next.js <Link> the avatar is often nested under in /plans.
+      // We need BOTH stopPropagation AND preventDefault:
+      //   - stopPropagation halts React synthetic event bubbling so the
+      //     Link's onClick doesn't fire (no router.push)
+      //   - preventDefault sets defaultPrevented on the native event so
+      //     the underlying <a>'s built-in href navigation doesn't fire
+      //     either (this was the actual cause of the "close goes to
+      //     detail page" bug — the native anchor click was navigating
+      //     even though React handlers were blocked)
+      // Touch and mousedown only stopPropagation — do NOT preventDefault
+      // on touchend, or the browser will skip synthesizing the click
+      // event and the close button's onClick never fires.
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
       onTouchEnd={(e) => e.stopPropagation()}
     >
       {/* Click-outside-image catcher. Sits behind the image; clicking
