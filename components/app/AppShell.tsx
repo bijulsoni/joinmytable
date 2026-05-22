@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { requireSessionUser } from '@/lib/auth/session';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { BottomNav, BottomNavSpacer } from '@/components/ui';
 import { UserMenu } from './UserMenu';
 import { ChatNotifications } from './ChatNotifications';
@@ -50,6 +51,24 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
   const name = user.profile?.name ?? user.email;
   const initials = initialsOf(user.profile?.name ?? null, user.email);
 
+  // Fetch the user's own hero photo for the avatar pill. RLS allows
+  // self-select on companion_profiles so this works without admin.
+  // Null when the user hasn't uploaded any photos yet — UserMenu
+  // falls back to initials in that case.
+  let photoUrl: string | null = null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: cp } = await supabase
+      .from('companion_profiles')
+      .select('photo_urls')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const photos = (cp as { photo_urls: string[] | null } | null)?.photo_urls ?? null;
+    photoUrl = photos?.[0] ?? null;
+  } catch {
+    // Header avatar is decorative; never block the page on this lookup.
+  }
+
   return (
     <ChatDockProvider>
       <div className={styles.appShell}>
@@ -71,7 +90,7 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
               </Link>
             </nav>
             <div className={styles.right}>
-              <UserMenu name={name} email={user.email} initials={initials} />
+              <UserMenu name={name} email={user.email} initials={initials} photoUrl={photoUrl} />
             </div>
           </div>
         </header>

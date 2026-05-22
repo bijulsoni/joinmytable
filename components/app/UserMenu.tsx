@@ -9,12 +9,15 @@ interface UserMenuProps {
   name: string;
   email: string;
   initials: string;
+  /** Hero photo URL (companion_profiles.photo_urls[0]). When set, the
+   *  avatar pill renders the photo; otherwise it falls back to initials. */
+  photoUrl: string | null;
 }
 
 // User menu — avatar pill in the top-right that opens a small popover
 // with "View profile / Verification / Sign out". The signout is a form
 // POST so it works without JS.
-export function UserMenu({ name, email, initials }: UserMenuProps) {
+export function UserMenu({ name, email, initials, photoUrl }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -46,9 +49,14 @@ export function UserMenu({ name, email, initials }: UserMenuProps) {
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        <span className={styles.avatar} aria-hidden>
-          {initials}
-        </span>
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photoUrl} alt="" className={styles.avatarPhoto} />
+        ) : (
+          <span className={styles.avatar} aria-hidden>
+            {initials}
+          </span>
+        )}
         <span className={styles.chev} aria-hidden>
           ▾
         </span>

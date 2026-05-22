@@ -42,6 +42,17 @@
   letter-spacing: 0.02em;
 }
 
+.avatarPhoto {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  object-position: center 30%;
+  display: block;
+  background: var(--color-surface-muted);
+  box-shadow: 0 0 0 1px var(--color-border) inset;
+}
+
 .chev {
   font-size: 0.625rem;
   color: var(--color-text-tertiary);
