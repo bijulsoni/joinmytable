@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signUpAction, type SignUpState } from './actions';
+import { GoogleButton } from '../GoogleButton';
 import styles from '../styles.module.css';
 
 const INITIAL: SignUpState = { status: 'idle' };
@@ -66,11 +67,39 @@ function InviteField() {
   );
 }
 
+// Surfaces the reason a Google sign-up bounced back from /callback. The
+// callback enforces the invite gate for brand-new OAuth users and
+// redirects here with ?oauth=<reason> on failure.
+const OAUTH_MESSAGES: Record<string, string> = {
+  invite_required: 'You need an invite code to join the beta. Enter it below, then continue.',
+  invite_invalid: 'That invite code isn’t valid. Check it and try again.',
+  invite_taken: 'That invite code was just fully used. Try a different one.',
+  mirror_failed: 'Something went wrong setting up your account. Please try again.',
+};
+
+function OAuthNotice() {
+  const search = useSearchParams();
+  const reason = search.get('oauth');
+  if (!reason) return null;
+  const message = OAUTH_MESSAGES[reason] ?? 'Google sign-in didn’t complete. Please try again.';
+  return (
+    <div className={styles.error} role="alert">
+      {message}
+    </div>
+  );
+}
+
 export function SignUpForm() {
   const [state, formAction] = useActionState(signUpAction, INITIAL);
 
   return (
     <form action={formAction} className={styles.form} noValidate>
+      <Suspense fallback={null}>
+        <OAuthNotice />
+      </Suspense>
+      <GoogleButton mode="sign-up" />
+      <div className={styles.oauthDivider}>or sign up with email</div>
+
       <div className={styles.field}>
         <label htmlFor="name" className={styles.label}>
           Name

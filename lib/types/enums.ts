@@ -49,6 +49,29 @@ export const VERIFICATION_STATUSES: readonly VerificationStatus[] = [
   'verified',
 ] as const;
 
+/**
+ * users.gender + element type of users.interested_in.
+ *
+ * Minimal MVP value set. A NULL column (not representable here) means
+ * "prefer not to say" for gender, or "open to all" for interested_in.
+ * Both fields are optional and feed a SOFT discovery ranking only —
+ * never a hard filter (see migration 20260529000300_search_soft_match).
+ */
+export type Gender = 'man' | 'woman' | 'nonbinary';
+
+export const GENDERS: readonly Gender[] = ['man', 'woman', 'nonbinary'] as const;
+
+export function isGender(value: unknown): value is Gender {
+  return value === 'man' || value === 'woman' || value === 'nonbinary';
+}
+
+/** Labels for the /welcome "About you" step. */
+export const GENDER_META: Readonly<Record<Gender, { self: string; plural: string }>> = {
+  man: { self: 'Man', plural: 'Men' },
+  woman: { self: 'Woman', plural: 'Women' },
+  nonbinary: { self: 'Non-binary', plural: 'Non-binary people' },
+};
+
 /** Seeker-chosen activity-cost cap (CLAUDE.md core product rule #5). */
 export type BudgetTier = '$' | '$$' | '$$$';
 

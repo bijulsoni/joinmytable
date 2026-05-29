@@ -26,6 +26,7 @@ import type {
   EscrowStatus,
   RequestStatus,
   VerificationStatus,
+  Gender,
 } from './enums';
 
 /** GeoJSON Point as returned by PostgREST for `geography(Point, 4326)`. */
@@ -63,6 +64,10 @@ export interface UserRow {
   is_seeker: boolean;
   is_companion: boolean;
   verification_status: VerificationStatus;
+  /** Own gender. Null = prefer not to say. Soft ranking signal only. */
+  gender: Gender | null;
+  /** Genders the user wants to meet. Null/empty = open to all. */
+  interested_in: Gender[] | null;
   /** Null until the user finishes the /welcome onboarding flow. */
   onboarded_at: string | null;
   created_at: string;

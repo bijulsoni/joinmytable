@@ -10,7 +10,14 @@
 
 import { useCallback, useRef, useState, useTransition, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ACTIVITY_TYPES, type ActivityType, ACTIVITY_TYPE_META } from '@/lib/types';
+import {
+  ACTIVITY_TYPES,
+  type ActivityType,
+  ACTIVITY_TYPE_META,
+  GENDERS,
+  GENDER_META,
+  type Gender,
+} from '@/lib/types';
 import { completeWelcomeAction } from './actions';
 import styles from './styles.module.css';
 
@@ -26,6 +33,8 @@ interface Props {
 interface FormValues {
   bio: string;
   service_area: string;
+  gender: Gender | null;
+  interestedIn: Record<Gender, boolean>;
   paidCompanionOn: boolean;
   activities: Record<ActivityType, boolean>;
   rates: Record<ActivityType, string>;
@@ -35,6 +44,8 @@ function blankForm(): FormValues {
   return {
     bio: '',
     service_area: '',
+    gender: null,
+    interestedIn: { man: false, woman: false, nonbinary: false },
     paidCompanionOn: false,
     activities: { lunch: false, dinner: false, coffee: false, happy_hour: false },
     rates: {
@@ -202,11 +213,18 @@ export function WelcomeForm({ initialName }: Props) {
         }
       }
 
+      // Gender + interested-in are optional. Unselected gender → null
+      // ("prefer not to say"); no interested-in boxes ticked → null
+      // ("open to all"). Both are soft ranking signals, never filters.
+      const interestedIn = GENDERS.filter((g) => form.interestedIn[g]);
+
       startTransition(async () => {
         const result = await completeWelcomeAction({
           bio: form.bio.trim() || null,
           service_area: form.service_area.trim() || null,
           location: pendingLocation,
+          gender: form.gender,
+          interested_in: interestedIn.length > 0 ? interestedIn : null,
           paidCompanionOn: form.paidCompanionOn,
           activities,
           rates,
@@ -285,6 +303,60 @@ export function WelcomeForm({ initialName }: Props) {
           onChange={(e) => setForm({ ...form, bio: e.target.value })}
           placeholder={`Hey, I'm ${firstName}. I work in… I love…`}
         />
+      </section>
+
+      {/* About you — gender + who you'd like to meet */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionHeading}>About you</h2>
+        <p className={styles.sectionHelp}>
+          Helps us show you better matches first. Optional — and never used to hide anyone.
+        </p>
+
+        <p className={styles.subLabel}>You are…</p>
+        <div className={styles.choiceRow}>
+          {GENDERS.map((g) => (
+            <button
+              key={g}
+              type="button"
+              className={`${styles.choiceChip} ${form.gender === g ? styles.choiceChipActive : ''}`}
+              aria-pressed={form.gender === g}
+              onClick={() => setForm((prev) => ({ ...prev, gender: prev.gender === g ? null : g }))}
+            >
+              {GENDER_META[g].self}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`${styles.choiceChip} ${form.gender === null ? styles.choiceChipActive : ''}`}
+            aria-pressed={form.gender === null}
+            onClick={() => setForm((prev) => ({ ...prev, gender: null }))}
+          >
+            Prefer not to say
+          </button>
+        </div>
+
+        <p className={styles.subLabel}>You&apos;d like to meet…</p>
+        <div className={styles.choiceRow}>
+          {GENDERS.map((g) => (
+            <button
+              key={g}
+              type="button"
+              className={`${styles.choiceChip} ${form.interestedIn[g] ? styles.choiceChipActive : ''}`}
+              aria-pressed={form.interestedIn[g]}
+              onClick={() =>
+                setForm((prev) => ({
+                  ...prev,
+                  interestedIn: { ...prev.interestedIn, [g]: !prev.interestedIn[g] },
+                }))
+              }
+            >
+              {GENDER_META[g].plural}
+            </button>
+          ))}
+        </div>
+        <p className={styles.sectionHelp}>
+          Pick any. Leave all unchecked if you&apos;re open to meeting anyone.
+        </p>
       </section>
 
       {/* Location */}

@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase/server';
-import { ACTIVITY_TYPES, type ActivityType } from '@/lib/types';
+import { ACTIVITY_TYPES, type ActivityType, GENDERS } from '@/lib/types';
 
 const log = logger.child({ module: 'auth.welcome' });
 
@@ -20,11 +20,15 @@ const PointSchema = z.object({
   type: z.literal('Point'),
   coordinates: z.tuple([z.number().gte(-180).lte(180), z.number().gte(-90).lte(90)]),
 });
+const GenderSchema = z.enum(GENDERS as unknown as [string, ...string[]]);
 
 const InputSchema = z.object({
   bio: z.string().max(4000).nullable(),
   service_area: z.string().max(200).nullable(),
   location: PointSchema.nullable(),
+  // Optional preference fields. null = prefer not to say / open to all.
+  gender: GenderSchema.nullable(),
+  interested_in: z.array(GenderSchema).max(3).nullable(),
   paidCompanionOn: z.boolean(),
   activities: ActivitySchema,
   rates: RatesSchema,
@@ -134,9 +138,22 @@ export async function completeWelcomeAction(input: WelcomeInput): Promise<Welcom
       };
     };
   };
+  // Persist preferences + stamp onboarded_at in one write. gender +
+  // interested_in live on `users` (not companion_profiles) and feed the
+  // soft discovery ranking. Written via the admin client alongside
+  // onboarded_at — both are out of the RLS self-update allow-list.
+  // interested_in is de-duped; null stays null ("open to all").
+  const dedupedInterest =
+    parsed.data.interested_in && parsed.data.interested_in.length > 0
+      ? Array.from(new Set(parsed.data.interested_in))
+      : null;
   const { error: stampErr } = await admin
     .from('users')
-    .update({ onboarded_at: new Date().toISOString() })
+    .update({
+      onboarded_at: new Date().toISOString(),
+      gender: parsed.data.gender,
+      interested_in: dedupedInterest,
+    })
     .eq('id', userId);
   if (stampErr) {
     log.error({ err: stampErr.message, userId }, 'onboarded_at stamp failed');

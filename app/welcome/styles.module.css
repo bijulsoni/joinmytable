@@ -111,6 +111,47 @@
   color: var(--color-text-secondary);
 }
 
+/* "About you" — gender + interested-in chip selectors. */
+.subLabel {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.choiceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.choiceChip {
+  appearance: none;
+  cursor: pointer;
+  border: 1.5px solid var(--color-border-strong);
+  background: var(--color-surface, #fff);
+  color: var(--color-text-primary);
+  border-radius: 999px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.choiceChip:hover {
+  border-color: var(--color-accent);
+}
+
+.choiceChipActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-hover, var(--color-text-primary));
+}
+
 .input,
 .textarea {
   appearance: none;

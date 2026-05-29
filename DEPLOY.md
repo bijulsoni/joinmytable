@@ -201,6 +201,58 @@ Skip for first deploy. When ready:
 
 ---
 
+## Step 9 — Enable "Continue with Google" — **YOU** (15 min)
+
+Google sign-in is wired in code (the button is on /sign-up and /login).
+It stays dormant until you turn the provider on in Supabase. The invite
+gate still applies: a brand-new Google user must arrive via a
+`/sign-up?invite=CODE` link (or type a code first) — the `/callback`
+route validates + claims the code and rolls the account back if it's
+missing or invalid. Existing accounts just sign in.
+
+**A. Create Google OAuth credentials**
+
+1. Go to https://console.cloud.google.com → create a project (or reuse one).
+2. **APIs & Services → OAuth consent screen** → External → fill app name
+   "Konnly", support email, and the logo if you have one. Add your email
+   as a test user while the screen is in "Testing".
+3. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
+   - Application type: **Web application**
+   - **Authorized redirect URI** — paste your Supabase callback (NOT the
+     app URL). It's shown in the Supabase step below and looks like:
+     `https://<project-ref>.supabase.co/auth/v1/callback`
+4. Copy the **Client ID** and **Client secret**.
+
+**B. Turn the provider on in Supabase**
+
+1. Supabase dashboard → **Authentication → Providers → Google** → enable.
+2. Paste the Client ID + Client secret. Save. (This page also shows the
+   exact callback URL to paste back into Google in step A3.)
+3. Supabase dashboard → **Authentication → URL Configuration**:
+   - **Site URL:** your production origin, e.g. `https://www.konnly.com`
+   - **Redirect URLs (allow-list):** add every origin the button runs from:
+     ```
+     https://www.konnly.com/callback
+     https://konnly.com/callback
+     https://<your-vercel-preview>.vercel.app/callback
+     http://localhost:3000/callback
+     ```
+     The button sends users to `<origin>/callback`, so the origin must be
+     allow-listed or Supabase refuses the redirect.
+
+**C. Smoke test**
+
+- Open `https://www.konnly.com/sign-up?invite=<an unlimited code>` →
+  "Continue with Google" → pick an account → you should land on /welcome
+  as a brand-new account, with the invite slot consumed.
+- Open `/sign-up` with NO invite → "Continue with Google" → you should be
+  bounced back with "You need an invite code…". (Gate working.)
+- Sign out, then `/login` → "Continue with Google" → straight to /discover.
+
+No env vars or redeploy needed — it's all provider config.
+
+---
+
 ## Running the app in beta — daily ops
 
 ### Monitoring feedback

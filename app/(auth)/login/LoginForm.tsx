@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { loginAction, type LoginState } from './actions';
+import { GoogleButton } from '../GoogleButton';
 import styles from '../styles.module.css';
 
 const INITIAL: LoginState = { status: 'idle' };
@@ -22,6 +23,9 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className={styles.form} noValidate>
+      <GoogleButton mode="login" />
+      <div className={styles.oauthDivider}>or sign in with email</div>
+
       <div className={styles.field}>
         <label htmlFor="email" className={styles.label}>
           Email

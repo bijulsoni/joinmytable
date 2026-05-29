@@ -225,6 +225,76 @@
 
 /* -------- Buttons ------------------------------------------------------- */
 
+/* -------- OAuth (Continue with Google) --------------------------------- */
+
+.oauthDivider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.125rem 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.oauthDivider::before,
+.oauthDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.oauthButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  width: 100%;
+  appearance: none;
+  cursor: pointer;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  padding: 0.8125rem 1.25rem;
+  min-height: 48px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-spring);
+}
+
+.oauthButton:hover {
+  border-color: var(--color-text-tertiary);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.oauthButton:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.oauthButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.oauthButton:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.oauthIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 .primary {
   appearance: none;
   border: 0;
