@@ -8,15 +8,23 @@
 // Each code carries a max_uses cap (defaults to 1 so each share is
 // single-use) and optional expiry + note.
 //
+// For channel-based marketing — Facebook ads, Instagram bio link, etc.
+// — use --unlimited (or --max-uses none) to create a code that never
+// runs out, then attach a --note describing which channel it's for so
+// scripts/db/show-invite-stats.mjs can break down signups by channel.
+//
 // Usage:
 //   set -a; source .env.local; set +a
-//   node scripts/db/mint-invite-codes.mjs                  # 5 single-use codes
+//   node scripts/db/mint-invite-codes.mjs                                    # 5 single-use codes
 //   node scripts/db/mint-invite-codes.mjs --count 10
 //   node scripts/db/mint-invite-codes.mjs --count 1 --max-uses 50 --note "twitter thread"
+//   node scripts/db/mint-invite-codes.mjs --unlimited --note "facebook-jan-2027"
+//   node scripts/db/mint-invite-codes.mjs --max-uses none --note "instagram bio"
 //   node scripts/db/mint-invite-codes.mjs --expires-days 14
 //
 // Prints the codes to stdout, one per line — ready to copy/paste into
-// DMs to your friend circle.
+// DMs to your friend circle, or to attach to a sign-up URL like
+//   https://www.konnly.com/sign-up?invite=TABLE-XXXX-XX
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -29,6 +37,8 @@ if (!SUPABASE_URL || !SERVICE_ROLE) {
 }
 
 function parseArgs(argv) {
+  // maxUses === null means "unlimited" (invite_codes.max_uses is NULL).
+  // Default is 1 (single-use); --unlimited or --max-uses none sets to null.
   const out = { count: 5, maxUses: 1, expiresDays: null, note: null };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -37,9 +47,15 @@ function parseArgs(argv) {
       out.count = Math.max(1, Math.min(200, parseInt(next, 10) || 1));
       i++;
     } else if (a === '--max-uses' && next) {
-      const n = parseInt(next, 10);
-      out.maxUses = Number.isFinite(n) && n > 0 ? n : 1;
+      if (next === 'none' || next === 'unlimited' || next === 'null') {
+        out.maxUses = null;
+      } else {
+        const n = parseInt(next, 10);
+        out.maxUses = Number.isFinite(n) && n > 0 ? n : 1;
+      }
       i++;
+    } else if (a === '--unlimited') {
+      out.maxUses = null;
     } else if (a === '--expires-days' && next) {
       const n = parseInt(next, 10);
       out.expiresDays = Number.isFinite(n) && n > 0 ? n : null;
@@ -48,7 +64,19 @@ function parseArgs(argv) {
       out.note = String(next);
       i++;
     } else if (a === '--help' || a === '-h') {
-      console.log('Usage: mint-invite-codes [--count N] [--max-uses N] [--expires-days N] [--note "..."]');
+      console.log(
+        [
+          'Usage:',
+          '  mint-invite-codes [--count N] [--max-uses N|none] [--unlimited] [--expires-days N] [--note "..."]',
+          '',
+          'Examples:',
+          '  mint-invite-codes                                           # 5 single-use codes',
+          '  mint-invite-codes --count 20 --note "first cohort"',
+          '  mint-invite-codes --unlimited --note "facebook-ad-jan2027"  # unlimited channel code',
+          '  mint-invite-codes --max-uses 50 --note "twitter thread"     # limited multi-use',
+          '  mint-invite-codes --expires-days 14                         # auto-expire',
+        ].join('\n'),
+      );
       process.exit(0);
     }
   }
@@ -84,7 +112,7 @@ async function main() {
       : new Date(Date.now() + args.expiresDays * 24 * 60 * 60 * 1000).toISOString();
 
   console.log(
-    `\nMinting ${args.count} code(s)  ·  max_uses=${args.maxUses}  ·  ` +
+    `\nMinting ${args.count} code(s)  ·  max_uses=${args.maxUses === null ? 'unlimited' : args.maxUses}  ·  ` +
       `expires=${expiresAt ?? 'never'}${args.note ? `  ·  note="${args.note}"` : ''}\n`,
   );
 
