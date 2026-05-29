@@ -308,6 +308,50 @@
   margin-bottom: 0.875rem;
 }
 
+/* "Finding companions near you…" overlay during first geo-filtered
+   fetch. The seeded SSR list still renders behind it, dimmed, so the
+   page never looks empty — but the user understands what's happening
+   and the seed list won't be visually mistaken for the real result.
+
+   Once the real fetch lands, the dim class drops and the overlay
+   unmounts. ~200ms typical for return visitors (cached coords path),
+   ~1-2s for first-ever visitors waiting on browser geolocation. */
+.locatingOverlay {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--color-accent-tint);
+  border: 1px solid var(--color-accent-soft);
+  color: var(--color-accent-hover);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.875rem;
+}
+
+.locatingSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-accent-soft);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.gridDimmed {
+  opacity: 0.4;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out);
+}
+
 .cardDistance {
   font-weight: 600;
   color: var(--color-text-primary);

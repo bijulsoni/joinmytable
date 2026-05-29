@@ -46,6 +46,8 @@ const RADIUS_OPTIONS_MI = [5, 10, 25, 50, 100] as const;
 type RadiusMi = (typeof RADIUS_OPTIONS_MI)[number];
 const DEFAULT_RADIUS_MI: RadiusMi = 50;
 const RADIUS_STORAGE_KEY = 'jmt-discover-radius-mi';
+const LOCATION_CACHE_KEY = 'konnly-discover-loc-v1';
+const LOCATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const MI_TO_KM = 1.609344;
 
 function readStoredRadius(): RadiusMi {
@@ -58,6 +60,56 @@ function readStoredRadius(): RadiusMi {
     // ignored: privacy mode etc.
   }
   return DEFAULT_RADIUS_MI;
+}
+
+interface CachedLocation {
+  lat: number;
+  lng: number;
+  ts: number;
+}
+
+function readCachedLocation(): CachedLocation | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LOCATION_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedLocation;
+    if (
+      typeof parsed?.lat !== 'number' ||
+      typeof parsed?.lng !== 'number' ||
+      typeof parsed?.ts !== 'number'
+    ) {
+      return null;
+    }
+    if (Date.now() - parsed.ts > LOCATION_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedLocation(lat: number, lng: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const payload: CachedLocation = { lat, lng, ts: Date.now() };
+    window.localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignored
+  }
+}
+
+// Haversine — meters between two lat/lng pairs. Used to decide whether
+// a fresh GPS fix differs enough from the cached coords to bother
+// refetching. Below ~2 mi we keep the cached fetch and don't flicker.
+function metersBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const x = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
 }
 
 function initials(name: string): string {
@@ -82,50 +134,37 @@ type LocationState =
   | { status: 'unsupported' };
 
 export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError }: Props) {
+  // Why so many states: we want the user to NEVER see the unfiltered
+  // SSR seed flash on top before the geo-filtered list lands. Previous
+  // behavior was an LA visitor seeing the Seattle seeded set for ~1s
+  // before "no matches" snapped in. Now:
+  //   - first paint: seedCompanions render dimmed with an overlay
+  //   - return visitor (location cached): fetch fires immediately with
+  //     cached coords, list paints within ~200ms
+  //   - first-ever visitor: dimmed overlay until first fetch resolves
   const [companions, setCompanions] = useState<FeedCompanion[]>(seedCompanions);
   const [fetchError, setFetchError] = useState<string | null>(seedError);
   const [location, setLocation] = useState<LocationState>({ status: 'idle' });
   const [radiusMi, setRadiusMi] = useState<RadiusMi>(DEFAULT_RADIUS_MI);
   const [refreshing, setRefreshing] = useState(false);
+  // True until the first geo-filtered (or no-geo fallback) fetch lands.
+  // Used to dim the seed list + show "Finding companions near you…"
+  // overlay so the LA→0 flash never appears.
+  const [firstFetchPending, setFirstFetchPending] = useState(true);
 
   // Client-side filters layered on top of the geo-filtered server set.
   const [activityFilter, setActivityFilter] = useState<ActivityType | null>(null);
   const [areaQuery, setAreaQuery] = useState('');
 
-  // Track whether we've already done the post-mount fetch so radius
-  // changes don't fire twice on first paint.
-  const initialFetchDone = useRef(false);
+  // Track which fetch was kicked off by the cached-location fast path
+  // vs. the fresh GPS path, so a slow fresh-GPS callback can't override
+  // an already-served cached fetch unnecessarily.
+  const lastFetchedCoords = useRef<{ lat: number; lng: number } | null>(null);
 
-  // Hydrate the stored radius preference + kick off geolocation. We do
-  // this in a single effect so the initial fetch picks up the stored
-  // radius rather than the default-then-overwrite race.
-  useEffect(() => {
-    setRadiusMi(readStoredRadius());
-
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setLocation({ status: 'unsupported' });
-      return;
-    }
-    setLocation({ status: 'requesting' });
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({
-          status: 'granted',
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
-      },
-      (err) => {
-        setLocation({ status: 'denied', reason: err.message || 'Location unavailable.' });
-      },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60_000 },
-    );
-  }, []);
-
-  // Whenever we have a location + radius, fetch the filtered list.
   const fetchFiltered = useCallback(async (lat: number, lng: number, radiusKm: number) => {
     setRefreshing(true);
     setFetchError(null);
+    lastFetchedCoords.current = { lat, lng };
     try {
       const params = new URLSearchParams({
         lat: String(lat),
@@ -149,14 +188,71 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
       setFetchError(err instanceof Error ? err.message : 'Could not refresh nearby companions.');
     } finally {
       setRefreshing(false);
+      setFirstFetchPending(false);
     }
   }, []);
 
+  // Mount: hydrate radius preference, then race the cached-location
+  // fast path against a fresh geolocation request.
+  useEffect(() => {
+    const storedRadius = readStoredRadius();
+    setRadiusMi(storedRadius);
+
+    const cached = readCachedLocation();
+    if (cached) {
+      // Fast path: paint filtered immediately using yesterday's coords.
+      // Avoids the seed-flash flicker entirely for return visitors.
+      setLocation({ status: 'granted', lat: cached.lat, lng: cached.lng });
+      void fetchFiltered(cached.lat, cached.lng, storedRadius * MI_TO_KM);
+    }
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      if (!cached) {
+        setLocation({ status: 'unsupported' });
+        setFirstFetchPending(false);
+      }
+      return;
+    }
+
+    if (!cached) {
+      setLocation({ status: 'requesting' });
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const fresh = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        writeCachedLocation(fresh.lat, fresh.lng);
+        setLocation({ status: 'granted', ...fresh });
+        // If the fresh fix is meaningfully far from what we already
+        // fetched with (e.g. user opened the app from a new city), do
+        // another fetch. Below ~2 mi we don't bother — the result set
+        // is the same and the network call would just cause a flicker.
+        const prior = lastFetchedCoords.current;
+        const needsRefetch = !prior || metersBetween(prior, fresh) > 3200; // ~2 mi
+        if (needsRefetch) {
+          void fetchFiltered(fresh.lat, fresh.lng, storedRadius * MI_TO_KM);
+        }
+      },
+      (err) => {
+        if (!cached) {
+          setLocation({ status: 'denied', reason: err.message || 'Location unavailable.' });
+          setFirstFetchPending(false);
+        }
+        // If we had cached coords we just keep using them; the fresh
+        // denial isn't worth flipping the UI back to the no-geo state.
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60_000 },
+    );
+  }, [fetchFiltered]);
+
+  // Radius-change-driven refetch (separate from the initial mount race
+  // above so radius changes don't trigger geolocation requests).
   useEffect(() => {
     if (location.status !== 'granted') return;
-    initialFetchDone.current = true;
+    if (firstFetchPending) return; // initial fetch handles the first round
     void fetchFiltered(location.lat, location.lng, radiusMi * MI_TO_KM);
-  }, [location, radiusMi, fetchFiltered]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radiusMi]);
 
   const handleRadiusChange = useCallback((next: RadiusMi) => {
     setRadiusMi(next);
@@ -317,7 +413,14 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
         </div>
       ) : null}
 
-      {filtered.length === 0 ? (
+      {firstFetchPending ? (
+        <div className={styles.locatingOverlay} role="status" aria-live="polite">
+          <span className={styles.locatingSpinner} aria-hidden />
+          <span>Finding companions near you…</span>
+        </div>
+      ) : null}
+
+      {!firstFetchPending && filtered.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon} aria-hidden>
             ☕
@@ -344,8 +447,13 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
             Reset filters
           </button>
         </div>
-      ) : (
-        <ul className={styles.grid}>
+      ) : filtered.length > 0 ? (
+        <ul
+          className={[styles.grid, firstFetchPending ? styles.gridDimmed : '']
+            .filter(Boolean)
+            .join(' ')}
+          aria-busy={firstFetchPending}
+        >
           {filtered.map((c) => {
             const distanceLabel = formatDistance(c.distance_km);
             return (
@@ -407,7 +515,7 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
             );
           })}
         </ul>
-      )}
+      ) : null}
     </div>
   );
 }
