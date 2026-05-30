@@ -160,6 +160,18 @@
   max-width: 30rem;
 }
 
+.betaNote {
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  max-width: 30rem;
+  background: var(--color-accent-tint, #fff1ea);
+  border: 1px solid var(--color-accent-soft, #ffe2d4);
+  border-radius: var(--radius-md, 10px);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
 .ctaRow {
   display: flex;
   flex-direction: column;

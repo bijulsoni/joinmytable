@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { BetaBadge } from '@/components/app/BetaBadge';
 import styles from './styles.module.css';
 
 // Shared shell for every (auth) screen — sign-up, login, forgot, reset,
@@ -13,12 +14,15 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <Link href="/" className={styles.wordmark}>
           <span className={styles.wordmarkMark}>◖</span>
           Konnly
+          <BetaBadge />
         </Link>
       </header>
       <main className={styles.shellMain}>
         <div className={styles.shellInner}>{children}</div>
       </main>
-      <footer className={styles.shellFooter}>Public venues only. Verified companions only.</footer>
+      <footer className={styles.shellFooter}>
+        Private beta · Seattle–Bellevue area · Public venues only · Verified companions only
+      </footer>
     </div>
   );
 }

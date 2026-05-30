@@ -13,7 +13,7 @@ export default async function AdminDashboard() {
   const admin = authAdminClient();
 
   // Run the counts concurrently.
-  const [pendingVerifications, totalFeedback, totalUsers, redemptions, inviteCodes] =
+  const [pendingVerifications, totalFeedback, totalUsers, redemptions, inviteCodes, waitlist] =
     await Promise.all([
       admin
         .from('users')
@@ -34,6 +34,10 @@ export default async function AdminDashboard() {
         .then((r) => r.count ?? 0),
       admin
         .from('invite_codes')
+        .select('id', { count: 'exact', head: true })
+        .then((r) => r.count ?? 0),
+      admin
+        .from('waitlist')
         .select('id', { count: 'exact', head: true })
         .then((r) => r.count ?? 0),
     ]);
@@ -63,6 +67,12 @@ export default async function AdminDashboard() {
       label: 'Total members',
       value: totalUsers,
       hint: 'All registered accounts',
+    },
+    {
+      href: '/admin/waitlist',
+      label: 'Waitlist',
+      value: waitlist,
+      hint: 'Out-of-region — next-region signal',
     },
   ];
 

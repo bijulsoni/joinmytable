@@ -1,0 +1,33 @@
+/* Local bits for the waitlist admin page. Everything structural lives in
+   the shared admin stylesheet (../styles.module.css) — this file only holds
+   the few extras the shared classes don't cover. */
+
+/* The "top cities" pill row inside the summary card. Wraps freely so the
+   ranking stays readable at any width. */
+.cities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* The trailing count inside a city pill, e.g. "Los Angeles · 4". Slightly
+   bolder + tinted so the demand signal pops out of the label. */
+.cityCount {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+/* Right-align + tabular figures for the coordinate cell so the columns of
+   numbers line up nicely down the table. */
+.coordsCell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+
+/* Keep the relative time from wrapping; the full timestamp is on hover. */
+.whenCell {
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}

@@ -1,0 +1,116 @@
+.checking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  padding: 3rem 1rem;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-accent-soft);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.softNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  margin-bottom: 1rem;
+  background: var(--color-surface-muted, #f4f1ec);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 10px);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+/* -------- Blocked (out of region) -------------------------------------- */
+
+.blocked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  max-width: 30rem;
+  margin: 1rem auto;
+  padding: 2rem 1.5rem;
+  background: var(--gradient-card, var(--color-surface, #fff));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl, 18px);
+  box-shadow: var(--shadow-md);
+}
+
+.blockedIcon {
+  font-size: 2.5rem;
+}
+
+.blockedTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.blockedText {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.joinButton {
+  appearance: none;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-pill, 999px);
+  padding: 0.8125rem 1.5rem;
+  margin-top: 0.25rem;
+  background: var(--gradient-cta, var(--color-accent));
+  color: var(--color-text-inverse, #fff);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-cta);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.joinButton:active {
+  transform: scale(0.99);
+}
+
+.joinButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.joined {
+  padding: 0.875rem 1rem;
+  background: #e7f6ec;
+  color: #1f7a43;
+  border-radius: var(--radius-md, 10px);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.error {
+  margin: 0;
+  color: #b8362d;
+  font-size: 0.8125rem;
+}

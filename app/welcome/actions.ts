@@ -38,6 +38,54 @@ export type WelcomeInput = z.infer<typeof InputSchema>;
 
 export type WelcomeResult = { ok: true } | { ok: false; error: string };
 
+// Out-of-region waitlist capture. Called by the region gate on /welcome
+// when a brand-new user's geolocation falls outside the open service
+// area. We already know they're authenticated (they just signed up), so
+// we capture the email we have plus their coords + reverse-geocoded city
+// to prioritize which region to open next. Upsert on email so repeated
+// attempts don't error or duplicate.
+const WaitlistSchema = z.object({
+  email: z.string().email(),
+  lat: z.number().gte(-90).lte(90).nullable(),
+  lng: z.number().gte(-180).lte(180).nullable(),
+  city: z.string().max(200).nullable(),
+});
+
+export async function joinWaitlistAction(input: {
+  email: string;
+  lat: number | null;
+  lng: number | null;
+  city: string | null;
+}): Promise<WelcomeResult> {
+  const parsed = WaitlistSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: 'Enter a valid email.' };
+  }
+  const admin = createSupabaseAdminClient() as unknown as {
+    from: (table: string) => {
+      upsert: (
+        row: Record<string, unknown>,
+        opts: { onConflict: string },
+      ) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+  const { error } = await admin.from('waitlist').upsert(
+    {
+      email: parsed.data.email.toLowerCase(),
+      lat: parsed.data.lat,
+      lng: parsed.data.lng,
+      city: parsed.data.city,
+      source: 'region_gate',
+    },
+    { onConflict: 'email' },
+  );
+  if (error) {
+    log.error({ err: error.message }, 'waitlist upsert failed');
+    return { ok: false, error: 'Could not add you to the waitlist. Please try again.' };
+  }
+  return { ok: true };
+}
+
 export async function completeWelcomeAction(input: WelcomeInput): Promise<WelcomeResult> {
   const parsed = InputSchema.safeParse(input);
   if (!parsed.success) {

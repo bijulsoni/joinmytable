@@ -7,6 +7,7 @@ import { getSessionUser } from '@/lib/auth/session';
 import { homePathForUser } from '@/lib/auth/home-path';
 import { ACTIVITY_TYPE_META, type ActivityType } from '@/lib/types';
 import { RotatingActivity } from './RotatingActivity';
+import { BetaBadge } from '@/components/app/BetaBadge';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -34,6 +35,7 @@ export default async function HomePage() {
         <Link href="/" className={styles.wordmark}>
           <span className={styles.wordmarkMark}>◖</span>
           Konnly
+          <BetaBadge />
         </Link>
         <Link href="/login" className={styles.topbarLogin}>
           Sign in
@@ -47,6 +49,11 @@ export default async function HomePage() {
           Konnly is real plans with real people. Pick a coffee, lunch, happy hour, or dinner. We
           match you with a friendly, verified companion who&apos;s up for it. You cover the bill
           plus a flat fee — they show up and make it better.
+        </p>
+
+        <p className={styles.betaNote}>
+          🌲 Now in private beta in the <strong>Seattle–Bellevue area</strong>. Elsewhere? Sign up
+          and we’ll add you to the waitlist for your city.
         </p>
 
         <div className={styles.ctaRow}>

@@ -20,7 +20,10 @@ export default async function SignUpPage() {
   return (
     <div className={styles.card}>
       <h1 className={styles.heading}>Create your account</h1>
-      <p className={styles.subheading}>Pick how you&apos;d like to use Konnly. You can do both.</p>
+      <p className={styles.subheading}>
+        Konnly is in private beta, open in the Seattle–Bellevue area. Elsewhere? Sign up and
+        we&apos;ll waitlist you for your city.
+      </p>
       <SignUpForm />
     </div>
   );

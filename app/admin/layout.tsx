@@ -36,6 +36,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/verifications" className={styles.navLink}>
               Verifications
             </Link>
+            <Link href="/admin/waitlist" className={styles.navLink}>
+              Waitlist
+            </Link>
           </nav>
           <div className={styles.topbarRight}>
             <span className={styles.adminEmail}>{user.email}</span>

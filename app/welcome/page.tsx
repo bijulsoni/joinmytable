@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/app';
 import { requireSessionUser } from '@/lib/auth/session';
 import { WelcomeForm } from './WelcomeForm';
+import { RegionGate } from './RegionGate';
 import styles from './styles.module.css';
 
 export const metadata: Metadata = {
@@ -49,7 +50,9 @@ export default async function WelcomePage() {
           </p>
         </header>
 
-        <WelcomeForm initialName={user.profile.name} />
+        <RegionGate isAdmin={user.profile.is_admin} email={user.email}>
+          <WelcomeForm initialName={user.profile.name} />
+        </RegionGate>
       </main>
     </AppShell>
   );

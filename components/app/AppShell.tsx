@@ -4,6 +4,8 @@ import { requireSessionUser } from '@/lib/auth/session';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { BottomNav, BottomNavSpacer } from '@/components/ui';
 import { UserMenu } from './UserMenu';
+import { BetaBadge } from './BetaBadge';
+import { BetaWelcomeBanner } from './BetaWelcomeBanner';
 import { ChatNotifications } from './ChatNotifications';
 import { RequestNotifications } from './RequestNotifications';
 import { ChatDockProvider } from '@/lib/chat/dock-context';
@@ -77,6 +79,7 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
             <Link href="/discover" className={styles.wordmark}>
               <span className={styles.wordmarkMark}>◖</span>
               Konnly
+              <BetaBadge />
             </Link>
             <nav className={styles.nav} aria-label="Primary">
               <Link href="/discover" className={styles.navLink}>
@@ -101,6 +104,7 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
           </div>
         </header>
         <main className={styles.main}>{children}</main>
+        <BetaWelcomeBanner />
         <BottomNavSpacer />
         <BottomNav />
         <ChatNotifications userId={user.id} />
