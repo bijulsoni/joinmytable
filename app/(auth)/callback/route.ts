@@ -13,14 +13,21 @@
 //   3. Brand-new OAuth user — NO mirror row yet. This is the only path
 //      that can create an account without going through the email
 //      sign-up form, so it MUST enforce the private-beta invite gate
-//      (a beta invariant). The invite code rides in on `?invite=` (set
-//      by the "Continue with Google" button). We preflight + claim it,
-//      create the mirror row, and on ANY failure roll the auth user back
-//      so a half-created account can't slip past the gate.
+//      (a beta invariant). We preflight + claim the invite, create the
+//      mirror row, and on ANY failure roll the auth user back so a
+//      half-created account can't slip past the gate.
 //
-// Implementation note: exchangeCodeForSession sets the session cookie via
-// the SSR client's cookie adapter, which only mutates outgoing cookies
-// from a route handler — so we set them on the NextResponse here.
+// Invite delivery: the "Continue with Google" button drops the code in a
+// short-lived `konnly_invite` cookie BEFORE redirecting to Google, and
+// also appends ?invite= as a belt-and-suspenders fallback. We read the
+// cookie first because Supabase does not reliably preserve extra query
+// params across the provider round-trip.
+//
+// Cookie handling: exchangeCodeForSession (and signOut) write session
+// cookies through the SSR client's adapter. We collect every such write
+// and replay it onto whatever redirect response we ultimately return —
+// otherwise a fresh NextResponse.redirect would silently drop the
+// session and the user wouldn't actually be logged in.
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
@@ -32,35 +39,53 @@ import { logger } from '@/lib/logger';
 
 const log = logger.child({ module: 'auth.callback' });
 
+const INVITE_COOKIE = 'konnly_invite';
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
   const next = url.searchParams.get('next');
-  const invite = (url.searchParams.get('invite') ?? '').trim().toUpperCase();
+
+  // Invite from the cookie (reliable) first, query param (fallback) second.
+  const inviteFromCookie = (request.cookies.get(INVITE_COOKIE)?.value ?? '').trim().toUpperCase();
+  const inviteFromParam = (url.searchParams.get('invite') ?? '').trim().toUpperCase();
+  const invite = inviteFromCookie || inviteFromParam;
+
+  // Every cookie the Supabase adapter wants to set during this request.
+  // Replayed onto the final redirect so the session actually persists.
+  const pendingCookies: { name: string; value: string; options: CookieOptions }[] = [];
+
+  // Build a redirect that carries the session cookies + clears the
+  // one-shot invite cookie.
+  const finish = (path: string): NextResponse => {
+    const res = NextResponse.redirect(new URL(path, request.url));
+    for (const c of pendingCookies) {
+      res.cookies.set({ name: c.name, value: c.value, ...c.options });
+    }
+    res.cookies.set({ name: INVITE_COOKIE, value: '', path: '/', maxAge: 0 });
+    return res;
+  };
 
   if (!code) {
-    return NextResponse.redirect(new URL('/login?callback=missing', request.url));
+    return finish('/login?callback=missing');
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.redirect(new URL('/login?callback=env', request.url));
+    return finish('/login?callback=env');
   }
 
-  // Pre-build a response so the SSR client can write the session cookie
-  // onto it. We override the redirect location at the end.
-  const response = NextResponse.redirect(new URL(next ?? '/welcome', request.url));
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(name: string) {
         return request.cookies.get(name)?.value;
       },
       set(name: string, value: string, options: CookieOptions) {
-        response.cookies.set({ name, value, ...options });
+        pendingCookies.push({ name, value, options });
       },
       remove(name: string, options: CookieOptions) {
-        response.cookies.set({ name, value: '', ...options });
+        pendingCookies.push({ name, value: '', options });
       },
     },
   });
@@ -68,28 +93,29 @@ export async function GET(request: NextRequest) {
   const { data: exchanged, error: exchangeError } =
     await supabase.auth.exchangeCodeForSession(code);
   if (exchangeError || !exchanged.user) {
-    return NextResponse.redirect(new URL('/login?callback=invalid', request.url));
+    return finish('/login?callback=invalid');
   }
 
   const authUser = exchanged.user;
   const admin = createSupabaseAdminClient();
 
-  // Does a mirror row already exist? This is what separates an existing
-  // account (flows 1 & 2) from a brand-new OAuth user (flow 3).
+  // Mirror row existence separates an existing account (flows 1 & 2)
+  // from a brand-new OAuth user (flow 3).
   const { data: existingMirror } = await admin
     .from('users')
     .select('onboarded_at, is_seeker, is_companion')
     .eq('id', authUser.id)
     .maybeSingle();
 
-  // Helper: tear down the just-authenticated session + auth user so a
-  // gate failure leaves nothing behind.
+  // Tear down the just-authenticated session + auth user so a gate
+  // failure leaves nothing behind. signOut pushes cookie-clears into
+  // pendingCookies, which finish() then applies.
   const rollbackAuthUser = async (reason: string) => {
     log.warn({ userId: authUser.id, reason }, 'oauth invite gate: rolling back new auth user');
     try {
       await supabase.auth.signOut();
     } catch {
-      // ignored — we still delete the user below
+      // still delete the user below
     }
     try {
       await admin.auth.admin.deleteUser(authUser.id);
@@ -109,26 +135,25 @@ export async function GET(request: NextRequest) {
       is_seeker: boolean;
       is_companion: boolean;
     };
-    const dest = next ?? homePathForUser(mirror);
-    return NextResponse.redirect(new URL(dest, request.url));
+    return finish(next ?? homePathForUser(mirror));
   }
 
   // Flow 3 — brand-new OAuth user. Enforce the invite gate.
   if (!invite) {
     await rollbackAuthUser('missing invite');
-    return NextResponse.redirect(new URL('/sign-up?oauth=invite_required', request.url));
+    return finish('/sign-up?oauth=invite_required');
   }
 
   const preflight = await preflightInvite(invite);
   if (!preflight.ok) {
     await rollbackAuthUser('invalid invite');
-    return NextResponse.redirect(new URL('/sign-up?oauth=invite_invalid', request.url));
+    return finish('/sign-up?oauth=invite_invalid');
   }
 
   const claimed = await claimInvite(preflight.row, authUser.id);
   if (!claimed) {
     await rollbackAuthUser('invite claim lost race');
-    return NextResponse.redirect(new URL('/sign-up?oauth=invite_taken', request.url));
+    return finish('/sign-up?oauth=invite_taken');
   }
 
   // Name from the OAuth identity, falling back to the email local-part.
@@ -151,9 +176,9 @@ export async function GET(request: NextRequest) {
     log.error({ err: mirror.error, userId: authUser.id }, 'oauth mirror row insert failed');
     await releaseInvite(preflight.row, authUser.id);
     await rollbackAuthUser('mirror row insert failed');
-    return NextResponse.redirect(new URL('/sign-up?oauth=mirror_failed', request.url));
+    return finish('/sign-up?oauth=mirror_failed');
   }
 
-  // New account created — send them through onboarding.
-  return NextResponse.redirect(new URL('/welcome', request.url));
+  // New account created + session preserved — into onboarding.
+  return finish('/welcome');
 }

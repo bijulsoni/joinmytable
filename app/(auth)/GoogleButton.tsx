@@ -60,6 +60,12 @@ export function GoogleButton({ mode }: Props) {
         setError('Enter your invite code first, then continue with Google.');
         return;
       }
+      // Stash the invite in a short-lived, same-origin cookie. This is
+      // the reliable channel — Supabase does not consistently preserve
+      // extra query params across the Google round-trip, so the callback
+      // reads this cookie first. We ALSO pass ?invite= as a fallback.
+      const secure = window.location.protocol === 'https:' ? '; secure' : '';
+      document.cookie = `konnly_invite=${encodeURIComponent(invite)}; path=/; max-age=900; samesite=lax${secure}`;
       params.set('invite', invite);
     }
 
