@@ -1,0 +1,94 @@
+/* Feedback-route specifics. Everything generic (page, table, pills, empty)
+   comes from the shared admin stylesheet — this file only holds the bits
+   that the shared system doesn't already cover: the filter bar and the few
+   table cells that need their own width / wrapping behaviour. */
+
+/* -------- Filter bar --------------------------------------------------- */
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.chips,
+.windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* A filter link styled like a pill toggle. Active state borrows the accent
+   so the current selection is obvious. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface, #fff);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.chipActive,
+.chipActive:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tint, #fff6f1);
+  color: var(--color-accent-hover, var(--color-accent));
+}
+
+/* -------- Table cells -------------------------------------------------- */
+
+.whenCell {
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+
+.fromCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 9rem;
+}
+
+.fromName {
+  font-weight: 600;
+}
+
+.fromEmail {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+}
+
+.pageCell {
+  max-width: 14rem;
+}
+
+.pageUrl {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+}
+
+/* The message is the point of this screen — let it wrap freely and give it
+   the lion's share of the width. */
+.messageCell {
+  min-width: 18rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+}

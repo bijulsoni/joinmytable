@@ -90,7 +90,13 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
               </Link>
             </nav>
             <div className={styles.right}>
-              <UserMenu name={name} email={user.email} initials={initials} photoUrl={photoUrl} />
+              <UserMenu
+                name={name}
+                email={user.email}
+                initials={initials}
+                photoUrl={photoUrl}
+                isAdmin={user.profile?.is_admin ?? false}
+              />
             </div>
           </div>
         </header>

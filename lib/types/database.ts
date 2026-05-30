@@ -63,6 +63,8 @@ export interface UserRow {
   name: string;
   is_seeker: boolean;
   is_companion: boolean;
+  /** Grants access to /admin. Set only via service-role script. */
+  is_admin: boolean;
   verification_status: VerificationStatus;
   /** Own gender. Null = prefer not to say. Soft ranking signal only. */
   gender: Gender | null;

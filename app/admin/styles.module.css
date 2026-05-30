@@ -1,0 +1,406 @@
+/* Admin console styles. Shared across all /admin routes.
+   Deliberately plainer than the consumer app — this is an internal tool,
+   so it favors density + legibility over flourish. Uses the same design
+   tokens (colors, radii, fonts) as the rest of the app for consistency. */
+
+.shell {
+  min-height: 100dvh;
+  background: var(--color-surface-muted, #f7f5f1);
+  color: var(--color-text-primary);
+}
+
+/* -------- Topbar ------------------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-surface, #fff);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.topbarInner {
+  max-width: 64rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 1.25rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.brandMark {
+  color: var(--color-accent);
+}
+
+.brandTag {
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-accent-hover, var(--color-accent));
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.1rem 0.4rem;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.navLink {
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.navLink:hover {
+  background: var(--color-surface-muted, #f0ede8);
+  color: var(--color-text-primary);
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  white-space: nowrap;
+}
+
+.adminEmail {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+}
+
+.backToApp {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-accent-hover, var(--color-accent));
+}
+
+@media (max-width: 720px) {
+  .adminEmail {
+    display: none;
+  }
+}
+
+/* -------- Main + page header ------------------------------------------- */
+
+.main {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 4rem;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  font-weight: 500;
+}
+
+.lede {
+  margin: -0.75rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+}
+
+/* -------- Dashboard stat cards ----------------------------------------- */
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.875rem;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1.125rem 1.25rem;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 14px);
+  transition:
+    border-color 120ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.statCard:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.statCardUrgent {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tint, #fff6f1);
+}
+
+.statValue {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.statHint {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+/* -------- Quick actions ------------------------------------------------ */
+
+.quickLinks {
+  margin-top: 0.5rem;
+}
+
+.quickRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.quickLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.9375rem;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.quickLink:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tint, #fff6f1);
+}
+
+/* -------- Shared: section card + table --------------------------------- */
+
+.card {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 14px);
+  padding: 1.25rem;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--color-surface, #fff);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.75rem 0.875rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.table th {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+  background: var(--color-surface-muted, #faf8f5);
+  position: sticky;
+  top: 0;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: var(--color-surface-muted, #faf8f5);
+}
+
+/* -------- Shared: buttons + pills -------------------------------------- */
+
+.btn {
+  appearance: none;
+  cursor: pointer;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface, #fff);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.btn:hover {
+  border-color: var(--color-accent);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  border: 0;
+  background: var(--gradient-cta, var(--color-accent));
+  color: var(--color-text-inverse, #fff);
+  box-shadow: var(--shadow-cta);
+}
+
+.btnDanger {
+  border-color: #d8584f;
+  color: #b8362d;
+}
+
+.btnDanger:hover {
+  border-color: #b8362d;
+  background: #fdeceb;
+}
+
+.btnGhost {
+  border-color: transparent;
+  background: transparent;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--color-surface-muted, #f0ede8);
+  color: var(--color-text-secondary);
+}
+
+.pillGood {
+  background: #e7f6ec;
+  color: #1f7a43;
+}
+
+.pillWarn {
+  background: #fff3e0;
+  color: #9a6212;
+}
+
+.pillMuted {
+  background: var(--color-surface-muted, #f0ede8);
+  color: var(--color-text-tertiary);
+}
+
+/* -------- Shared: empty + form bits ------------------------------------ */
+
+.empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--color-text-tertiary);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.875rem;
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.input,
+.textarea,
+.select {
+  appearance: none;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.625rem;
+  font: inherit;
+  font-size: 0.875rem;
+  background: var(--color-surface, #fff);
+  color: var(--color-text-primary);
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.help {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+.error {
+  color: #b8362d;
+  font-size: 0.8125rem;
+}
+
+.ok {
+  color: #1f7a43;
+  font-size: 0.8125rem;
+}

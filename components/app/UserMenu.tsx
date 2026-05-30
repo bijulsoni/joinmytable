@@ -12,12 +12,14 @@ interface UserMenuProps {
   /** Hero photo URL (companion_profiles.photo_urls[0]). When set, the
    *  avatar pill renders the photo; otherwise it falls back to initials. */
   photoUrl: string | null;
+  /** Shows the Admin console link in the menu when true. */
+  isAdmin?: boolean;
 }
 
 // User menu — avatar pill in the top-right that opens a small popover
 // with "View profile / Verification / Sign out". The signout is a form
 // POST so it works without JS.
-export function UserMenu({ name, email, initials, photoUrl }: UserMenuProps) {
+export function UserMenu({ name, email, initials, photoUrl, isAdmin = false }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -94,6 +96,19 @@ export function UserMenu({ name, email, initials, photoUrl }: UserMenuProps) {
           >
             <span aria-hidden>💬</span> Report an issue
           </button>
+          {isAdmin ? (
+            <>
+              <div className={styles.divider} aria-hidden />
+              <Link
+                href="/admin"
+                className={styles.item}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+              >
+                <span aria-hidden>🛠️</span> Admin console
+              </Link>
+            </>
+          ) : null}
           <div className={styles.divider} aria-hidden />
           <form action="/logout" method="post" className={styles.signoutForm}>
             <button type="submit" className={`${styles.item} ${styles.signout}`} role="menuitem">
