@@ -8,6 +8,7 @@ import 'server-only';
 // These helpers always re-read the session from the Supabase cookie and
 // re-query `public.users` for role/verification state.
 
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { authServerClient } from './db';
 import type { UserRow } from '@/lib/types';
@@ -26,8 +27,16 @@ export interface SessionUser {
 /**
  * Read the current session. Returns null when the user is signed out
  * or the cookie is missing / expired.
+ *
+ * Wrapped in React `cache()` so it runs AT MOST ONCE per request. This
+ * matters a lot for performance: nearly every page resolves the session
+ * twice — once in the page body and again inside <AppShell> — and
+ * getUser() is a network round-trip to Supabase Auth (~60ms+) plus a
+ * `users` select. The cache collapses those duplicate calls (and any
+ * other getSessionUser/requireSessionUser callers in the same render)
+ * into a single auth + profile fetch.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await authServerClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) {
@@ -46,7 +55,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     emailConfirmed: Boolean(data.user.email_confirmed_at),
     profile: (profile as UserRow | null) ?? null,
   };
-}
+});
 
 /**
  * Require a signed-in user. Redirects to the login screen when no

@@ -1,14 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { headers } from 'next/headers';
 import { EmptyState } from '@/components/ui';
 import { StatusMessage } from '@/components/StatusMessage';
 import { AppShell } from '@/components/app';
 import { getSessionUser } from '@/lib/auth/session';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { loadPublicCompanionProfile } from '@/app/api/profiles/_lib/load';
 import { RequestComposer } from './RequestComposer';
 import { ProfilePhotoSurface } from './ProfilePhotoSurface';
 import { ACTIVITY_TYPES } from '@/lib/types';
+import type { LooseSupabaseClient } from '@/app/api/_lib';
 import type { PublicCompanionProfileDTO } from '@/app/api/profiles/_lib/types';
 import styles from './styles.module.css';
 
@@ -28,36 +30,8 @@ export const metadata: Metadata = {
 // adds friction without aiding the request flow, and the latter has no
 // real data to show until the reviews API ships.
 
-interface ProfileResponse {
-  profile: PublicCompanionProfileDTO;
-}
-
 interface RouteContext {
   params: Promise<{ id: string }>;
-}
-
-async function loadProfile(id: string): Promise<PublicCompanionProfileDTO | null> {
-  // Server-side fetches need an absolute origin. Pull host + proto from
-  // the incoming request rather than baking an env var in: the Frontend
-  // agent does not own deployment config.
-  const h = await headers();
-  const host = h.get('x-forwarded-host') ?? h.get('host');
-  const proto = h.get('x-forwarded-proto') ?? 'http';
-  const cookie = h.get('cookie') ?? '';
-  if (!host) return null;
-  const url = `${proto}://${host}/api/profiles/${id}`;
-
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: { Accept: 'application/json', cookie },
-    cache: 'no-store',
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`Profile fetch failed (${res.status}).`);
-  }
-  const body = (await res.json()) as ProfileResponse;
-  return body.profile;
 }
 
 export default async function CompanionPublicProfilePage(ctx: RouteContext) {
@@ -67,10 +41,15 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
     redirect(`/login?next=/companions/${id}`);
   }
 
+  // Load the profile DIRECTLY in-process (RLS-scoped) instead of fetching
+  // our own /api/profiles/[id] over HTTP — that self-round-trip re-ran
+  // auth (a second getUser) on top of the page's, the single biggest
+  // chunk of this page's old load time.
   let profile: PublicCompanionProfileDTO | null = null;
   let loadError: string | null = null;
   try {
-    profile = await loadProfile(id);
+    const supabase = (await createSupabaseServerClient()) as unknown as LooseSupabaseClient;
+    profile = await loadPublicCompanionProfile(supabase, id);
   } catch (err) {
     loadError = err instanceof Error ? err.message : 'Could not load companion profile.';
   }
