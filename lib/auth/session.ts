@@ -38,21 +38,30 @@ export interface SessionUser {
  */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await authServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
+
+  // Use getSession() (local cookie decode, NO network) rather than
+  // getUser() (a network round-trip to Supabase Auth, ~63ms). This is
+  // safe because middleware.ts calls getUser() on every matched request
+  // FIRST — that's our single server-side validation + token-refresh
+  // point. By the time a page/route renders, the cookie has already been
+  // validated and refreshed for this request, so re-validating over the
+  // network here is pure duplicated latency on the critical path.
+  const { data, error } = await supabase.auth.getSession();
+  const user = data.session?.user;
+  if (error || !user) {
     return null;
   }
 
   const { data: profile } = await supabase
     .from('users')
     .select('*')
-    .eq('id', data.user.id)
+    .eq('id', user.id)
     .maybeSingle();
 
   return {
-    id: data.user.id,
-    email: data.user.email ?? '',
-    emailConfirmed: Boolean(data.user.email_confirmed_at),
+    id: user.id,
+    email: user.email ?? '',
+    emailConfirmed: Boolean(user.email_confirmed_at),
     profile: (profile as UserRow | null) ?? null,
   };
 });
