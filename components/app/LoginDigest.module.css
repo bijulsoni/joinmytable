@@ -1,0 +1,121 @@
+.wrap {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 0.75rem);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  padding: 0 0.75rem;
+  pointer-events: none;
+}
+
+.card {
+  pointer-events: auto;
+  position: relative;
+  width: 100%;
+  max-width: 30rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.125rem;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-accent-soft, #ffe2d4);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow-lg, 0 16px 40px rgba(0, 0, 0, 0.18));
+  animation: digestIn 260ms var(--ease-out, ease-out);
+}
+
+@keyframes digestIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: var(--color-text-tertiary);
+  padding: 0.25rem;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding-right: 1rem;
+}
+
+.emoji {
+  font-size: 1.25rem;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.title {
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+  line-height: 1.3;
+}
+
+.subtitle {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.primary,
+.secondary {
+  appearance: none;
+  cursor: pointer;
+  border-radius: var(--radius-pill, 999px);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: transform 120ms ease;
+}
+
+.primary {
+  border: 0;
+  background: var(--gradient-cta, var(--color-accent));
+  color: var(--color-text-inverse, #fff);
+  box-shadow: var(--shadow-cta);
+}
+
+.secondary {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface, #fff);
+  color: var(--color-text-primary);
+}
+
+.primary:active,
+.secondary:active {
+  transform: scale(0.98);
+}

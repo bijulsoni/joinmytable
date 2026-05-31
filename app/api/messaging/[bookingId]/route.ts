@@ -96,6 +96,26 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ bookingId:
     return apiError('internal_error', `Could not load messages: ${error.message}`);
   }
 
+  // Opening a thread marks it read for this user — drives the offline
+  // "you missed this" digest (GET /api/notifications/summary) and clears
+  // the unread state once they've actually looked. Best-effort: a failure
+  // here must not break loading the conversation.
+  const reads = caller.supabase as unknown as {
+    from: (t: string) => {
+      upsert: (
+        row: Record<string, unknown>,
+        opts: { onConflict: string },
+      ) => Promise<{ error: { message: string } | null }>;
+    };
+  };
+  await reads
+    .from('message_reads')
+    .upsert(
+      { user_id: caller.userId, booking_id: bookingId, last_read_at: new Date().toISOString() },
+      { onConflict: 'user_id,booking_id' },
+    )
+    .catch(() => undefined);
+
   return NextResponse.json({
     booking: {
       id: b.id,

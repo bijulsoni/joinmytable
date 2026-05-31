@@ -6,6 +6,7 @@ import { BottomNav, BottomNavSpacer } from '@/components/ui';
 import { UserMenu } from './UserMenu';
 import { BetaBadge } from './BetaBadge';
 import { BetaWelcomeBanner } from './BetaWelcomeBanner';
+import { LoginDigest } from './LoginDigest';
 import { ChatNotifications } from './ChatNotifications';
 import { RequestNotifications } from './RequestNotifications';
 import { ChatDockProvider } from '@/lib/chat/dock-context';
@@ -107,6 +108,7 @@ export async function AppShell({ children, requireAuth = true, loginRedirectTo }
         <BetaWelcomeBanner />
         <BottomNavSpacer />
         <BottomNav />
+        <LoginDigest />
         <ChatNotifications userId={user.id} />
         <RequestNotifications userId={user.id} />
         <ChatDock />
