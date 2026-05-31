@@ -98,8 +98,14 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ bookingId:
 
   // Opening a thread marks it read for this user — drives the offline
   // "you missed this" digest (GET /api/notifications/summary) and clears
-  // the unread state once they've actually looked. Best-effort: a failure
-  // here must not break loading the conversation.
+  // the unread state once they've actually looked.
+  //
+  // STRICTLY best-effort: loading the conversation must never fail
+  // because of this. Note the await-with-try/catch shape: the supabase
+  // query builder is a thenable but does NOT implement `.catch`, so
+  // `builder.catch(...)` would throw synchronously and 500 the whole
+  // request. We await it (it resolves to `{ error }`) and swallow both
+  // the resolved error and any thrown error.
   const reads = caller.supabase as unknown as {
     from: (t: string) => {
       upsert: (
@@ -108,13 +114,20 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ bookingId:
       ) => Promise<{ error: { message: string } | null }>;
     };
   };
-  await reads
-    .from('message_reads')
-    .upsert(
-      { user_id: caller.userId, booking_id: bookingId, last_read_at: new Date().toISOString() },
-      { onConflict: 'user_id,booking_id' },
-    )
-    .catch(() => undefined);
+  try {
+    const { error: readErr } = await reads
+      .from('message_reads')
+      .upsert(
+        { user_id: caller.userId, booking_id: bookingId, last_read_at: new Date().toISOString() },
+        { onConflict: 'user_id,booking_id' },
+      );
+    if (readErr) {
+      // Non-fatal — just log; the thread still loads.
+      console.warn('message_reads upsert failed:', readErr.message);
+    }
+  } catch {
+    // Never let read-marking break the conversation load.
+  }
 
   return NextResponse.json({
     booking: {
