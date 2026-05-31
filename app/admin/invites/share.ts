@@ -31,8 +31,8 @@ export const SHARE_VARIANTS: ShareVariant[] = [
     label: 'Short (X / Twitter)',
     build: (url) =>
       `${KONNLY_TAGLINE} I'm beta-testing Konnly — it matches you with friendly, ` +
-      `verified people for coffee, lunch, happy hour, or dinner. Real plans, no swiping. ` +
-      `Join with my invite: ${url}`,
+      `verified people for coffee, lunch, happy hour, or dinner. Real plans with real ` +
+      `people. Come join me: ${url}`,
   },
   {
     key: 'instagram',
@@ -41,7 +41,7 @@ export const SHARE_VARIANTS: ShareVariant[] = [
       `${KONNLY_TAGLINE} ☕🍽️\n\n` +
       `Konnly is a small Pacific-Northwest beta that matches you with friendly, ` +
       `verified people for real plans — coffee, lunch, happy hour, dinner. ` +
-      `No swiping, no games.\n\n` +
+      `Good company, real places, easy and warm.\n\n` +
       `Come be human with me 👇\n${url}`,
   },
   {
@@ -53,7 +53,8 @@ export const SHARE_VARIANTS: ShareVariant[] = [
       `the time we get back is best spent on what actually makes us human — real ` +
       `connection. I've been testing it (a small Pacific-Northwest beta) — it matches ` +
       `you with friendly, verified people for coffee, lunch, happy hour, or dinner, ` +
-      `always in public spots, everyone verified. No endless swiping, just a real plan.\n\n` +
-      `It's invite-only during beta. Join with my link:\n${url}`,
+      `always in public spots, everyone verified. It's warm, easygoing, and a genuinely ` +
+      `lovely way to share an hour with someone.\n\n` +
+      `It's invite-only during beta. Come join me:\n${url}`,
   },
 ];
