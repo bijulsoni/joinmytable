@@ -45,10 +45,13 @@ export default async function HomePage() {
       <section className={styles.hero}>
         <RotatingActivity />
 
+        <p className={styles.tagline}>The more AI does, the more human you get to be.</p>
+
         <p className={styles.lede}>
-          Konnly is real plans with real people. Pick a coffee, lunch, happy hour, or dinner. We
-          match you with a friendly, verified companion who&apos;s up for it. You cover the bill
-          plus a flat fee — they show up and make it better.
+          As our tools take over the busywork, the time we get back is best spent on what makes us
+          human — real connection. Konnly turns that time into real plans with real people: coffee,
+          lunch, happy hour, dinner, with a friendly, verified companion who shows up and makes it
+          better.
         </p>
 
         <p className={styles.betaNote}>

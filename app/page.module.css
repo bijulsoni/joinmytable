@@ -152,6 +152,18 @@
   }
 }
 
+.tagline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  max-width: 30rem;
+  text-wrap: balance;
+}
+
 .lede {
   margin: 0;
   font-size: 1.0625rem;

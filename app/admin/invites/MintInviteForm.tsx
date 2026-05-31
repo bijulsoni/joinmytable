@@ -14,16 +14,9 @@
 
 import { useCallback, useState, useTransition, type FormEvent } from 'react';
 import { mintCodesAction } from './actions';
+import { ShareMessages } from './ShareMessages';
 import shared from '../styles.module.css';
 import styles from './styles.module.css';
-
-// Production base URL — this literal is intentional (share links must be
-// absolute and point at prod, never a preview/localhost host).
-const BASE_URL = 'https://www.konnly.com';
-
-function signupUrl(code: string): string {
-  return `${BASE_URL}/sign-up?invite=${code}`;
-}
 
 // "Unlimited" maps to null max_uses; everything else is a positive cap.
 const MAX_USES_OPTIONS: { label: string; value: string }[] = [
@@ -33,47 +26,6 @@ const MAX_USES_OPTIONS: { label: string; value: string }[] = [
   { label: '50 uses', value: '50' },
   { label: '100 uses', value: '100' },
   { label: 'Unlimited', value: 'unlimited' },
-];
-
-interface ShareVariant {
-  key: string;
-  label: string;
-  build: (url: string) => string;
-}
-
-// Warm, honest, beta-flavored copy. Each variant includes the invite URL.
-const SHARE_VARIANTS: ShareVariant[] = [
-  {
-    key: 'short',
-    label: 'Short (X / Twitter)',
-    build: (url) =>
-      `Coffee or a meal with someone new? I'm beta-testing Konnly — it matches you ` +
-      `with friendly, verified people for coffee, lunch, happy hour, or dinner. ` +
-      `Real plans, no swiping. Join with my invite: ${url}`,
-  },
-  {
-    key: 'instagram',
-    label: 'Instagram bio / DM',
-    build: (url) =>
-      `Trying something new ☕🍽️\n\n` +
-      `Konnly is a small Pacific-Northwest beta that matches you with friendly, ` +
-      `verified people for coffee, lunch, happy hour, or dinner. Real plans in real ` +
-      `places — no swiping, no games.\n\n` +
-      `Come try it with me 👇\n${url}`,
-  },
-  {
-    key: 'facebook',
-    label: 'Facebook / longer post',
-    build: (url) =>
-      `Want to grab coffee or a meal with someone new?\n\n` +
-      `I've been testing Konnly — a small Pacific-Northwest beta that matches you ` +
-      `with friendly, verified people for coffee, lunch, happy hour, or dinner. ` +
-      `Everything happens in public spots like cafés and restaurants, everyone's ` +
-      `verified, and it's honestly just a nice, low-pressure way to meet people over ` +
-      `a real plan instead of endless swiping.\n\n` +
-      `It's invite-only while in beta. If you'd like to try it, join with my invite ` +
-      `link here:\n${url}`,
-  },
 ];
 
 interface FormValues {
@@ -246,65 +198,10 @@ export function MintInviteForm() {
             Fresh codes — copy a sign-up message for the channel you&apos;re posting to.
           </p>
           {codes.map((code) => (
-            <NewCode key={code} code={code} />
+            <ShareMessages key={code} code={code} />
           ))}
         </div>
       ) : null}
     </div>
-  );
-}
-
-// One freshly-minted code with its three copy-pasteable share variants.
-function NewCode({ code }: { code: string }) {
-  const url = signupUrl(code);
-  return (
-    <div className={styles.codeBlock}>
-      <div className={styles.codeHead}>
-        <span className={styles.codeValue}>{code}</span>
-        <CopyButton text={url} label="Copy link" />
-      </div>
-      <div className={styles.variants}>
-        {SHARE_VARIANTS.map((v) => {
-          const message = v.build(url);
-          return (
-            <div key={v.key} className={styles.variant}>
-              <div className={styles.variantHead}>
-                <span className={styles.variantLabel}>{v.label}</span>
-                <CopyButton text={message} label="Copy" />
-              </div>
-              <p className={styles.shareBox}>{message}</p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Copy-to-clipboard button with a transient "Copied!" confirmation.
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const onCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      // Clipboard blocked (e.g. insecure context). Leave the message
-      // visible so the admin can select + copy it by hand.
-      setCopied(false);
-    }
-  }, [text]);
-
-  return (
-    <button
-      type="button"
-      className={`${shared.btn} ${shared.btnGhost} ${styles.copyBtn}`}
-      onClick={() => void onCopy()}
-      aria-live="polite"
-    >
-      {copied ? 'Copied!' : label}
-    </button>
   );
 }

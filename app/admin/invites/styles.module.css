@@ -99,3 +99,33 @@
 .copyBtn {
   white-space: nowrap;
 }
+
+/* -------- Expandable existing-code rows ------------------------------- */
+
+.codeRow {
+  cursor: pointer;
+}
+
+.expandCell {
+  width: 1.5rem;
+  text-align: center;
+  color: var(--color-text-tertiary);
+}
+
+.caret {
+  display: inline-block;
+  transition: transform 140ms ease;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.caretOpen {
+  transform: rotate(90deg);
+}
+
+/* The expanded row hosts the full share kit; drop the default cell
+   padding so the codeBlock sits flush, and tint it to read as a drawer. */
+.expandedRow > td {
+  padding: 0.75rem;
+  background: var(--color-surface-muted, #faf8f5);
+}

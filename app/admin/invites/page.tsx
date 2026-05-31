@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { authAdminClient } from '@/lib/auth/db';
 import { MintInviteForm } from './MintInviteForm';
+import { InviteCodesTable, type InviteRow } from './InviteCodesTable';
 import shared from '../styles.module.css';
 
 export const metadata: Metadata = { title: 'Invites · Admin' };
@@ -80,6 +81,21 @@ export default async function AdminInvitesPage() {
 
   const totalSignups = enriched.reduce((acc, c) => acc + c.redemptions, 0);
 
+  // Pre-format display strings on the server so the interactive client
+  // table has nothing locale/timezone-dependent to hydrate.
+  const rows: InviteRow[] = enriched.map((c) => {
+    const expires = formatExpires(c.expires_at);
+    return {
+      id: c.id,
+      code: c.code,
+      note: c.note,
+      usesLabel: `${c.redemptions}/${c.max_uses === null ? '∞' : String(c.max_uses)}`,
+      expiresText: expires.text,
+      expiresExpired: expires.expired,
+      createdText: formatCreated(c.created_at),
+    };
+  });
+
   return (
     <div className={shared.page}>
       <h1 className={shared.h1}>Invites</h1>
@@ -96,51 +112,17 @@ export default async function AdminInvitesPage() {
           {totalSignups === 1 ? '' : 's'} attributed
         </p>
 
-        {enriched.length === 0 ? (
+        {rows.length === 0 ? (
           <div className={shared.tableWrap}>
             <p className={shared.empty}>No invite codes yet. Mint your first one above.</p>
           </div>
         ) : (
-          <div className={shared.tableWrap}>
-            <table className={shared.table}>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Channel</th>
-                  <th>Uses</th>
-                  <th>Expires</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {enriched.map((c) => {
-                  const cap = c.max_uses === null ? '∞' : String(c.max_uses);
-                  const expires = formatExpires(c.expires_at);
-                  return (
-                    <tr key={c.id}>
-                      <td>
-                        <span className={shared.pill}>{c.code}</span>
-                      </td>
-                      <td>{c.note ? c.note : '—'}</td>
-                      <td>
-                        {c.redemptions}/{cap}
-                      </td>
-                      <td>
-                        {expires.expired ? (
-                          <span className={`${shared.pill} ${shared.pillWarn}`}>
-                            {expires.text}
-                          </span>
-                        ) : (
-                          expires.text
-                        )}
-                      </td>
-                      <td>{formatCreated(c.created_at)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <p className={shared.help} style={{ margin: '0 0 0.5rem' }}>
+              Tap any code to view &amp; copy its share messages again.
+            </p>
+            <InviteCodesTable rows={rows} />
+          </>
         )}
       </div>
     </div>
