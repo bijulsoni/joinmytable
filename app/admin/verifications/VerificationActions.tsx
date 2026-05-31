@@ -1,32 +1,39 @@
 'use client';
 
-// Approve / Reject buttons for a single pending applicant.
+// Tiered approve / reject for a single pending applicant.
 //
-// On success we router.refresh() so the applicant drops out of the
-// server-rendered list (and so the signed image URLs aren't kept stale).
-// We also flip into a "done" pill + disable the buttons so a fast double
-// click can't fire a second decision before the refresh lands.
+//   Approve · Basic   → selfie reviewed → discoverable in Explore, tagged
+//                        "Basic". Use when they only sent a selfie.
+//   Approve · Full ID → ID + selfie reviewed → "Verified" + can accept
+//                        meets. Use when a government ID is present.
+//   Reject            → back to unverified (destructive, confirmed).
+//
+// On success we router.refresh() so the applicant drops out of the list
+// (and the signed image URLs aren't kept stale), and flip to a done pill.
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { decideVerificationAction } from './actions';
 import shared from '../styles.module.css';
 
+type Decision = 'approve_basic' | 'approve_full' | 'reject';
+
 type Props = {
   userId: string;
   email: string | null;
+  /** Whether an ID document was uploaded — enables the Full ID approve. */
+  hasId: boolean;
 };
 
-export default function VerificationActions({ userId, email }: Props) {
+export default function VerificationActions({ userId, email, hasId }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<'approve' | 'reject' | null>(null);
+  const [done, setDone] = useState<Decision | null>(null);
 
-  function decide(decision: 'approve' | 'reject') {
+  function decide(decision: Decision) {
     setError(null);
 
-    // Rejecting is destructive (un-verifies them) — make the admin confirm.
     if (decision === 'reject') {
       const who = email ? ` ${email}` : '';
       if (!window.confirm(`Reject${who}? They'll be sent back to unverified.`)) {
@@ -41,17 +48,14 @@ export default function VerificationActions({ userId, email }: Props) {
         return;
       }
       setDone(decision);
-      // Re-pull the list so this applicant disappears from "pending".
       router.refresh();
     });
   }
 
   if (done) {
-    return (
-      <span className={done === 'approve' ? shared.pillGood : shared.pillMuted}>
-        {done === 'approve' ? '✅ Approved' : '🚫 Rejected'}
-      </span>
-    );
+    const label =
+      done === 'reject' ? '🚫 Rejected' : done === 'approve_full' ? '✅ Verified' : '✅ Basic';
+    return <span className={done === 'reject' ? shared.pillMuted : shared.pillGood}>{label}</span>;
   }
 
   return (
@@ -61,9 +65,19 @@ export default function VerificationActions({ userId, email }: Props) {
           type="button"
           className={`${shared.btn} ${shared.btnPrimary}`}
           disabled={isPending}
-          onClick={() => decide('approve')}
+          onClick={() => decide('approve_full')}
+          title={hasId ? 'ID present — full verification' : 'No ID uploaded yet'}
         >
-          {isPending ? 'Saving…' : 'Approve'}
+          {isPending ? 'Saving…' : 'Approve · Full ID'}
+        </button>
+        <button
+          type="button"
+          className={shared.btn}
+          disabled={isPending}
+          onClick={() => decide('approve_basic')}
+          title="Selfie only — discoverable, tagged Basic"
+        >
+          Approve · Basic
         </button>
         <button
           type="button"
@@ -74,6 +88,12 @@ export default function VerificationActions({ userId, email }: Props) {
           Reject
         </button>
       </div>
+      {!hasId ? (
+        <p className={shared.help} style={{ marginTop: '0.4rem' }}>
+          No government ID uploaded — “Full ID” will mark them verified anyway, so only use it if
+          you’ve confirmed identity another way. Otherwise approve as Basic.
+        </p>
+      ) : null}
       {error ? (
         <p className={shared.error} style={{ marginTop: '0.5rem' }}>
           {error}

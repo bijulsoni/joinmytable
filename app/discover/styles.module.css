@@ -591,6 +591,26 @@
   backdrop-filter: blur(8px);
 }
 
+/* Basic (selfie-only) tier — neutral, not a green check, so it reads as
+   "real person, lighter verification" rather than fully ID-verified. */
+.basicBadge {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.3125rem 0.625rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
+}
+
 .cardBody {
   padding: 1rem 1.125rem 1.25rem;
   display: flex;

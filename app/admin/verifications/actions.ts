@@ -7,11 +7,14 @@
 // just POST endpoints), so this action re-checks requireAdmin() before
 // touching the database.
 //
-// The approve/revoke writes mirror scripts/db/verify-companion.mjs exactly:
-//   approve → companion_profiles.verified_at = now()
-//             users.verification_status = 'verified'
-//   reject  → companion_profiles.verified_at = null
-//             users.verification_status = 'unverified'
+// Tiered approve / revoke (see CLAUDE.md core rule #10, tiered):
+//   approve_basic → verified_at = now()         (discoverable, "Basic")
+//                   id_verified_at unchanged     (stays null)
+//                   verification_status = 'verified'
+//   approve_full  → verified_at = now() (if unset) + id_verified_at = now()
+//                   verification_status = 'verified'   ("Verified", bookable)
+//   reject        → verified_at = null, id_verified_at = null
+//                   verification_status = 'unverified'
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -23,7 +26,7 @@ const log = logger.child({ module: 'admin-verifications' });
 
 const Schema = z.object({
   userId: z.string().uuid('Invalid user id.'),
-  decision: z.enum(['approve', 'reject']),
+  decision: z.enum(['approve_basic', 'approve_full', 'reject']),
 });
 
 export type DecideVerificationInput = z.input<typeof Schema>;
@@ -42,24 +45,34 @@ export async function decideVerificationAction(
   }
   const { userId, decision } = parsed.data;
 
-  // reject = revoke. Same two writes as the CLI script, just inverted values.
-  const revoke = decision === 'reject';
-  const verifiedAt = revoke ? null : new Date().toISOString();
-  const userStatus = revoke ? 'unverified' : 'verified';
-
+  const now = new Date().toISOString();
   const admin = authAdminClient();
 
-  // companion_profiles.verified_at gates discoverability.
+  // Build the companion_profiles patch per tier.
+  let cpPatch: Record<string, unknown>;
+  let userStatus: 'unverified' | 'verified';
+  if (decision === 'reject') {
+    cpPatch = { verified_at: null, id_verified_at: null };
+    userStatus = 'unverified';
+  } else if (decision === 'approve_basic') {
+    // Discoverable, but NOT id-verified (can't accept a meet yet).
+    cpPatch = { verified_at: now };
+    userStatus = 'verified';
+  } else {
+    // approve_full — discoverable AND id-verified (bookable).
+    cpPatch = { verified_at: now, id_verified_at: now };
+    userStatus = 'verified';
+  }
+
   const { error: cpErr } = await admin
     .from('companion_profiles')
-    .update({ verified_at: verifiedAt })
+    .update(cpPatch)
     .eq('user_id', userId);
   if (cpErr) {
     log.error({ err: cpErr.message, userId, decision }, 'companion_profiles update failed');
     return { ok: false, error: 'Could not update the companion profile. Please try again.' };
   }
 
-  // users.verification_status is the account-level signal.
   const { error: uErr } = await admin
     .from('users')
     .update({ verification_status: userStatus })

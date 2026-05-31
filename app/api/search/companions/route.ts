@@ -41,6 +41,9 @@ export interface SearchCompanionDTO {
   activities: ActivityType[];
   rates: Partial<Record<ActivityType, number>>;
   verified: boolean;
+  /** True only for full government-ID verification ("Verified" badge);
+   *  false = basic/selfie-only ("Basic"). */
+  fully_verified: boolean;
   distance_km: number | null;
 }
 
@@ -54,6 +57,7 @@ interface RpcRow {
   rates: Record<string, number> | null;
   rating_avg: number | string | null;
   verified_at: string | null;
+  id_verified_at: string | null;
   distance_km: number | string | null;
 }
 
@@ -83,6 +87,7 @@ function toDto(row: RpcRow): SearchCompanionDTO {
     activities: pickActivities(row.activities),
     rates: pickRates(row.rates),
     verified: row.verified_at !== null,
+    fully_verified: row.id_verified_at !== null,
     distance_km: row.distance_km === null ? null : Number(row.distance_km),
   };
 }

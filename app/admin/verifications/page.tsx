@@ -110,7 +110,9 @@ export default async function VerificationsPage() {
     <div className={shared.page}>
       <h1 className={shared.h1}>Verifications</h1>
       <p className={shared.lede}>
-        Review each applicant&rsquo;s government ID against their selfie, then approve or reject.
+        Approve <strong>Basic</strong> on a good selfie (gets them into Explore), or{' '}
+        <strong>Full ID</strong> when a government ID checks out against the selfie (lets them
+        accept meets). Reject sends them back to unverified.
       </p>
 
       {applicants.length === 0 ? (
@@ -178,7 +180,7 @@ export default async function VerificationsPage() {
               </div>
 
               <div className={styles.footer}>
-                <VerificationActions userId={a.id} email={a.email} />
+                <VerificationActions userId={a.id} email={a.email} hasId={a.idUrl !== null} />
               </div>
             </div>
           </div>

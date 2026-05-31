@@ -199,6 +199,25 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     return apiError('conflict', `Cannot transition a request in '${row.status}' state.`);
   }
 
+  // Safety gate (CLAUDE.md core rule #10, tiered): a "basic" companion
+  // (selfie-only, discoverable) must complete FULL government-ID
+  // verification before they can ACCEPT — i.e. before any in-person meet
+  // is confirmed. Declining needs no ID.
+  if (body.data.status === 'accepted') {
+    const { data: cpRaw } = await caller.supabase
+      .from('companion_profiles')
+      .select('id_verified_at')
+      .eq('user_id', caller.userId)
+      .maybeSingle();
+    const idVerifiedAt = (cpRaw as { id_verified_at: string | null } | null)?.id_verified_at;
+    if (!idVerifiedAt) {
+      return apiError(
+        'forbidden',
+        'Add your government ID to confirm a meet. Open Identity & verification to finish — it only takes a minute.',
+      );
+    }
+  }
+
   const { data: updated, error: updErr } = await caller.supabase
     .from('meal_requests')
     .update({ status: body.data.status })

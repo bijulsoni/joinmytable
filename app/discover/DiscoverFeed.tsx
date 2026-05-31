@@ -33,6 +33,9 @@ export interface FeedCompanion {
   activities: ActivityType[];
   rates: Partial<Record<ActivityType, number>>;
   verified: boolean;
+  /** True for full government-ID verification ("Verified"); false = basic
+   *  selfie-only ("Basic"). */
+  fully_verified?: boolean;
   /** Distance from the seeker's current location, when known. */
   distance_km?: number | null;
 }
@@ -476,9 +479,16 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
                         {initials(c.name)}
                       </div>
                     )}
-                    {c.verified ? (
-                      <span className={styles.verifiedBadge} title="Verified">
+                    {c.fully_verified ? (
+                      <span className={styles.verifiedBadge} title="ID verified">
                         ✓ Verified
+                      </span>
+                    ) : c.verified ? (
+                      <span
+                        className={styles.basicBadge}
+                        title="Selfie reviewed. Completes ID verification before confirming a meet."
+                      >
+                        Basic
                       </span>
                     ) : null}
                   </div>

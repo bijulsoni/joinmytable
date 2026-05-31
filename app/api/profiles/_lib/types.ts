@@ -72,6 +72,9 @@ export interface PublicCompanionProfileDTO {
   rates: CompanionRatesMap;
   photo_urls: string[];
   rating_avg: string;
+  /** True only for full government-ID verification ("Verified" badge);
+   *  false = basic/selfie-only ("Basic"). */
+  fully_verified: boolean;
   availability: AvailabilityDTO[];
 }
 
@@ -142,6 +145,7 @@ export function toPublicCompanionProfileDTO(
     rates: normalizeRates(profile.rates),
     photo_urls: normalizePhotos(profile.photo_urls),
     rating_avg: profile.rating_avg,
+    fully_verified: profile.id_verified_at !== null,
     availability: availability.map(toAvailabilityDTO),
   };
 }

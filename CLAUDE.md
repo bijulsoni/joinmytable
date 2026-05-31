@@ -33,7 +33,15 @@ report it rather than proceeding.
 7. **Companionship fee held in escrow**, released only after the activity is marked complete.
 8. **Chat unlocks only after a request is accepted.**
 9. **Reviews only allowed for completed bookings**, and are always two-way.
-10. **Unverified companions cannot be discovered or booked.**
+10. **Verification is tiered; identity gates the in-person meet.**
+    **Basic** (admin-reviewed selfie) makes a companion discoverable in
+    Explore, tagged "Basic" (`companion_profiles.verified_at`). **Full**
+    (government ID + selfie) earns the "Verified" badge
+    (`companion_profiles.id_verified_at`) and is **required before a
+    companion can accept a request / confirm an in-person meet.** A
+    companion with no reviewed selfie is never discoverable, and no
+    confirmed meet ever happens without full-ID verification — that
+    safety line is absolute.
 11. **Card data never touches our servers.** Stripe Elements only.
 12. **In-app messaging only.** No sharing of contact details before booking is confirmed.
 

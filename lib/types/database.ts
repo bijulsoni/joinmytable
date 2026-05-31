@@ -95,7 +95,11 @@ export interface CompanionProfileRow {
   rates: CompanionRatesMap | null;
   photo_urls: string[] | null;
   rating_avg: string;
+  /** Set when discoverable (basic/selfie OR full). Gates Explore visibility. */
   verified_at: string | null;
+  /** Set when full government-ID verified. NULL = basic/selfie-only.
+   *  Required to accept a request (confirm an in-person meet). */
+  id_verified_at: string | null;
   created_at: string;
 }
 

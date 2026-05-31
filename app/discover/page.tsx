@@ -21,6 +21,7 @@ interface CompanionRow {
   photo_urls: string[] | null;
   rating_avg: string | number | null;
   verified_at: string | null;
+  id_verified_at: string | null;
   users: { name: string | null } | null;
 }
 
@@ -50,7 +51,7 @@ export default async function DiscoverPage() {
   const { data, error } = await supabase
     .from('companion_profiles')
     .select(
-      'id, user_id, bio, service_area, activities, rates, photo_urls, rating_avg, verified_at, users:users!inner(name)',
+      'id, user_id, bio, service_area, activities, rates, photo_urls, rating_avg, verified_at, id_verified_at, users:users!inner(name)',
     )
     .not('verified_at', 'is', null)
     .neq('user_id', session.id)
@@ -68,6 +69,7 @@ export default async function DiscoverPage() {
     activities: pickActivities(row.activities),
     rates: pickRates(row.rates),
     verified: row.verified_at !== null,
+    fully_verified: row.id_verified_at !== null,
   }));
 
   return (

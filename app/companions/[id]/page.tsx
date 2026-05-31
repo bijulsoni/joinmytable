@@ -88,9 +88,18 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
             <div className={styles.heroInfo}>
               <div className={styles.nameRow}>
                 <h1 className={styles.name}>{profile.name}</h1>
-                <span className={styles.verified}>
-                  <span aria-hidden>✓</span> Verified
-                </span>
+                {profile.fully_verified ? (
+                  <span className={styles.verified} title="Government ID verified">
+                    <span aria-hidden>✓</span> Verified
+                  </span>
+                ) : (
+                  <span
+                    className={styles.basicTag}
+                    title="Selfie reviewed. Confirms ID before a meet is booked."
+                  >
+                    Basic
+                  </span>
+                )}
               </div>
               <div className={styles.metaRow}>
                 <span className={styles.metaRating}>

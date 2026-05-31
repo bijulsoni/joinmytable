@@ -13,11 +13,12 @@ import { authServerClient } from './db';
 import type { UserUpdate, VerificationStatus } from '@/lib/types';
 
 export interface CompanionVerificationInput {
-  /** Free-text legal name as presented on ID. */
+  /** Free-text legal name as presented on ID. Empty for selfie-only. */
   legalName: string;
-  /** Government-ID photo path in Supabase Storage (verification bucket). */
-  documentPath: string;
-  /** Selfie photo path in Supabase Storage (same bucket). */
+  /** Government-ID photo path in Storage. NULL for the selfie-only
+   *  (basic) tier — the ID can be added later, at accept time. */
+  documentPath: string | null;
+  /** Selfie photo path in Supabase Storage (same bucket). Required. */
   selfiePath: string;
 }
 
@@ -34,12 +35,9 @@ export interface CompanionVerificationInput {
 export async function submitCompanionVerification(
   input: CompanionVerificationInput,
 ): Promise<{ ok: true; status: VerificationStatus } | { ok: false; error: string }> {
-  if (!input.legalName.trim()) {
-    return { ok: false, error: 'Legal name is required for verification.' };
-  }
-  if (!input.documentPath.trim()) {
-    return { ok: false, error: 'A photo of your ID is required.' };
-  }
+  // Selfie is the only hard requirement (basic tier). Legal name + ID are
+  // optional here — they're collected for the full tier, either now or
+  // when the companion accepts their first request.
   if (!input.selfiePath.trim()) {
     return { ok: false, error: 'A selfie is required.' };
   }

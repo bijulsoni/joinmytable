@@ -22,42 +22,8 @@ export function CompanionVerifyForm() {
   return (
     <form action={formAction} className={styles.form} noValidate encType="multipart/form-data">
       <div className={styles.field}>
-        <label htmlFor="legalName" className={styles.label}>
-          Full legal name (as on your ID)
-        </label>
-        <input
-          id="legalName"
-          name="legalName"
-          type="text"
-          required
-          maxLength={200}
-          autoComplete="name"
-          className={styles.input}
-        />
-      </div>
-
-      <div className={styles.field}>
-        <label htmlFor="document" className={styles.label}>
-          Photo of your government-issued ID
-        </label>
-        <input
-          id="document"
-          name="document"
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-          capture="environment"
-          required
-          className={styles.input}
-        />
-        <p className={styles.helpText}>
-          Driver&apos;s license, passport, state ID. JPG/PNG/WEBP/HEIC, up to 10 MB. Stored
-          privately — only the review team sees it.
-        </p>
-      </div>
-
-      <div className={styles.field}>
         <label htmlFor="selfie" className={styles.label}>
-          Selfie
+          Selfie <span aria-hidden>·</span> required
         </label>
         <input
           id="selfie"
@@ -69,8 +35,41 @@ export function CompanionVerifyForm() {
           className={styles.input}
         />
         <p className={styles.helpText}>
-          On phone, this opens your front camera. Hold your ID next to your face if you can — the
-          clearer the match, the faster your review.
+          This is all we need to get you into Explore. On phone it opens your front camera. Stored
+          privately — only the review team sees it.
+        </p>
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="legalName" className={styles.label}>
+          Full legal name (optional — for ID step)
+        </label>
+        <input
+          id="legalName"
+          name="legalName"
+          type="text"
+          maxLength={200}
+          autoComplete="name"
+          className={styles.input}
+        />
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="document" className={styles.label}>
+          Photo of your government-issued ID <span aria-hidden>·</span> optional now
+        </label>
+        <input
+          id="document"
+          name="document"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+          capture="environment"
+          className={styles.input}
+        />
+        <p className={styles.helpText}>
+          Add it now to get fully verified faster, or later — you&apos;ll be asked for it when you
+          accept your first request to confirm a meet. Driver&apos;s license, passport, or state ID.
+          Stored privately.
         </p>
       </div>
 
