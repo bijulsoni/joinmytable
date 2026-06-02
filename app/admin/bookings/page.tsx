@@ -36,11 +36,13 @@ interface BookingRow {
   } | null;
 }
 
-// One payment row, narrowed to just what the Payout cell needs. There is
-// at most one payment per booking; we tolerate zero.
+// One payment row. paid_at is the real "seeker paid via Stripe" signal
+// (escrow_status is the separate held/released lifecycle). At most one per
+// booking; we tolerate zero.
 interface PaymentRow {
   booking_id: string;
   escrow_status: EscrowStatus;
+  paid_at: string | null;
 }
 
 // "just now / 5m ago / 3h ago / 2d ago / Mar 4, 2026" — same ladder as
@@ -74,13 +76,14 @@ function formatFee(value: number | string): string {
   return `$${Math.round(n)}`;
 }
 
-// Status → pill style. confirmed = upcoming/in-flight (warn), completed =
-// done + payable (good), cancelled = dead (muted).
-const STATUS_PILL: Record<BookingStatus, string | undefined> = {
-  confirmed: shared.pillWarn,
-  completed: shared.pillGood,
-  cancelled: shared.pillMuted,
-};
+// The booking lifecycle, spelled out so "confirmed" is never mistaken for
+// "paid". A confirmed booking splits on whether the seeker has paid yet.
+function lifecycle(status: BookingStatus, paid: boolean): { label: string; pill: string } {
+  if (status === 'cancelled') return { label: 'Cancelled', pill: shared.pillMuted ?? '' };
+  if (status === 'completed') return { label: 'Completed', pill: shared.pillGood ?? '' };
+  if (paid) return { label: 'Paid · ready to meet', pill: shared.pillGood ?? '' };
+  return { label: 'Accepted · awaiting payment', pill: shared.pillWarn ?? '' };
+}
 
 export default async function AdminBookingsPage() {
   const admin = authAdminClient();
@@ -104,31 +107,33 @@ export default async function AdminBookingsPage() {
 
   // Map payments by booking_id. 0 or 1 per booking; later rows would just
   // overwrite, but the data model guarantees uniqueness here.
-  const escrowByBooking = new Map<string, EscrowStatus>();
+  const paidAtByBooking = new Map<string, string>();
   const bookingIds = bookings.map((b) => b.id);
   if (bookingIds.length > 0) {
     const { data: paymentsData } = await admin
       .from('payments')
-      .select('booking_id, escrow_status')
+      .select('booking_id, escrow_status, paid_at')
       .in('booking_id', bookingIds);
     for (const p of (paymentsData ?? []) as PaymentRow[]) {
-      escrowByBooking.set(p.booking_id, p.escrow_status);
+      if (p.paid_at) paidAtByBooking.set(p.booking_id, p.paid_at);
     }
   }
 
   // Summary counts + outstanding payout volume (sum of completed fees).
-  let confirmed = 0;
+  let awaitingPayment = 0;
+  let paidReady = 0;
   let completed = 0;
   let cancelled = 0;
-  let completedFees = 0;
+  let payoutDue = 0; // completed + paid = a companion to pay
   for (const b of bookings) {
-    if (b.status === 'confirmed') confirmed += 1;
-    else if (b.status === 'completed') completed += 1;
-    else if (b.status === 'cancelled') cancelled += 1;
-    if (b.status === 'completed') {
+    const paid = paidAtByBooking.has(b.id);
+    if (b.status === 'cancelled') cancelled += 1;
+    else if (b.status === 'completed') {
+      completed += 1;
       const fee = typeof b.companion_fee === 'string' ? Number(b.companion_fee) : b.companion_fee;
-      if (Number.isFinite(fee)) completedFees += fee;
-    }
+      if (Number.isFinite(fee)) payoutDue += fee;
+    } else if (paid) paidReady += 1;
+    else awaitingPayment += 1;
   }
 
   const total = bookings.length;
@@ -145,8 +150,9 @@ export default async function AdminBookingsPage() {
       {/* Summary: status mix + the dollar volume owed/paid out on completed
           bookings. Newest {MAX_ROWS} bookings only. */}
       <p className={shared.lede}>
-        {countLabel} booking{total === 1 ? '' : 's'} · {confirmed} confirmed · {completed} completed
-        · {cancelled} cancelled · {formatFee(completedFees)} in completed-booking fees.
+        {countLabel} booking{total === 1 ? '' : 's'} · {awaitingPayment} awaiting payment ·{' '}
+        {paidReady} paid &amp; ready · {completed} completed · {cancelled} cancelled ·{' '}
+        {formatFee(payoutDue)} in completed-booking payouts.
       </p>
 
       {total === 0 ? (
@@ -162,6 +168,7 @@ export default async function AdminBookingsPage() {
                 <th>Companion</th>
                 <th>Fee</th>
                 <th>Status</th>
+                <th>Seeker paid?</th>
                 <th>Payout</th>
               </tr>
             </thead>
@@ -172,16 +179,30 @@ export default async function AdminBookingsPage() {
                   : null;
                 const seekerName = b.meal_requests?.seeker?.name ?? '—';
                 const companionName = b.meal_requests?.companion?.name ?? '—';
+                const paidAt = paidAtByBooking.get(b.id) ?? null;
+                const paid = paidAt !== null;
+                const stage = lifecycle(b.status, paid);
 
-                // Payout hint: only completed bookings are payable. If a
-                // payment row says the escrow was released, treat it as
-                // already paid; otherwise it's still pending.
+                // Seeker-paid cell: explicit ✓ + when, or awaiting.
+                let paidCell: React.ReactNode = '—';
+                if (b.status !== 'cancelled') {
+                  paidCell = paid ? (
+                    <span
+                      className={`${shared.pill} ${shared.pillGood ?? ''}`}
+                      title={fullWhen(paidAt)}
+                    >
+                      ✓ {formatWhen(paidAt)}
+                    </span>
+                  ) : (
+                    <span className={`${shared.pill} ${shared.pillWarn ?? ''}`}>Awaiting</span>
+                  );
+                }
+
+                // Payout hint: a completed booking with the fee collected is
+                // a companion you owe (manual Venmo/Zelle).
                 let payout = '—';
                 if (b.status === 'completed') {
-                  payout =
-                    escrowByBooking.get(b.id) === 'released'
-                      ? '✓ Paid'
-                      : '⏳ Pay companion via Venmo/Zelle';
+                  payout = '⏳ Pay companion via Venmo/Zelle';
                 }
 
                 return (
@@ -192,10 +213,9 @@ export default async function AdminBookingsPage() {
                     <td>{companionName}</td>
                     <td>{formatFee(b.companion_fee)}</td>
                     <td>
-                      <span className={`${shared.pill} ${STATUS_PILL[b.status] ?? ''}`}>
-                        {b.status}
-                      </span>
+                      <span className={`${shared.pill} ${stage.pill}`}>{stage.label}</span>
                     </td>
+                    <td>{paidCell}</td>
                     <td>{payout}</td>
                   </tr>
                 );
