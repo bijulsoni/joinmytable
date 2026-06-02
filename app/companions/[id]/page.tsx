@@ -100,6 +100,11 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
                     Basic
                   </span>
                 )}
+                {profile.is_founding ? (
+                  <span className={styles.foundingTag} title="One of Konnly's first companions">
+                    ★ Founding
+                  </span>
+                ) : null}
               </div>
               <div className={styles.metaRow}>
                 <span className={styles.metaRating}>

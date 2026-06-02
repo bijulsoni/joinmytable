@@ -176,6 +176,21 @@
   border-radius: var(--radius-pill);
 }
 
+/* Founding Companion — warm accent, a small status flourish. */
+.foundingTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-accent-hover, #d34624);
+  background: var(--color-accent-soft, #ffe2d4);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-pill);
+}
+
 .metaRow {
   display: flex;
   flex-direction: column;

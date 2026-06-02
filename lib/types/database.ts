@@ -100,6 +100,8 @@ export interface CompanionProfileRow {
   /** Set when full government-ID verified. NULL = basic/selfie-only.
    *  Required to accept a request (confirm an in-person meet). */
   id_verified_at: string | null;
+  /** Founding Companion (first 100 verified). Perk: no platform fee. */
+  is_founding: boolean;
   created_at: string;
 }
 

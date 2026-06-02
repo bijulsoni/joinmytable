@@ -64,6 +64,21 @@ export async function decideVerificationAction(
     userStatus = 'verified';
   }
 
+  // Founding Companion program: the first 100 approved companions get the
+  // founding flag (badge + no platform fee). Apply on any approval, only
+  // if they aren't already founding and a spot remains. Best-effort — a
+  // counting hiccup must never block the approval itself.
+  const FOUNDING_CAP = 100;
+  if (decision !== 'reject') {
+    const { count: foundingCount } = await admin
+      .from('companion_profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_founding', true);
+    if ((foundingCount ?? 0) < FOUNDING_CAP) {
+      cpPatch.is_founding = true;
+    }
+  }
+
   const { error: cpErr } = await admin
     .from('companion_profiles')
     .update(cpPatch)

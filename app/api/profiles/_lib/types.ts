@@ -75,6 +75,8 @@ export interface PublicCompanionProfileDTO {
   /** True only for full government-ID verification ("Verified" badge);
    *  false = basic/selfie-only ("Basic"). */
   fully_verified: boolean;
+  /** Founding Companion (first 100) — shows a Founding badge. */
+  is_founding: boolean;
   availability: AvailabilityDTO[];
 }
 
@@ -146,6 +148,7 @@ export function toPublicCompanionProfileDTO(
     photo_urls: normalizePhotos(profile.photo_urls),
     rating_avg: profile.rating_avg,
     fully_verified: profile.id_verified_at !== null,
+    is_founding: profile.is_founding === true,
     availability: availability.map(toAvailabilityDTO),
   };
 }

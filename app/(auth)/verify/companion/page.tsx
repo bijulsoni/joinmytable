@@ -50,13 +50,33 @@ export default async function CompanionVerifyPage() {
   }
 
   if (status === 'verified') {
+    // Tailor the "you're live" message to the tier + founding status.
+    const { data: cpRow } = await supabase
+      .from('companion_profiles')
+      .select('id_verified_at, is_founding')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const cp = cpRow as { id_verified_at: string | null; is_founding: boolean } | null;
+    const fullyVerified = Boolean(cp?.id_verified_at);
+    const founding = cp?.is_founding === true;
+
     return (
       <div className={styles.card}>
-        <h1 className={styles.heading}>You&apos;re verified ✓</h1>
+        <h1 className={styles.heading}>
+          {fullyVerified ? "You're verified ✓" : "You're live in Explore 🎉"}
+        </h1>
         <p className={styles.subheading}>
-          Your profile is live in /discover. Seekers can request activities with you, and the
-          verified badge shows on your card.
+          {fullyVerified
+            ? 'Your profile is live with the Verified badge. Seekers can request activities with you, and you can accept and confirm meets.'
+            : 'Your profile is live, tagged Basic, and seekers can find and request you. One quick step before you can confirm your first meet: add a photo of your government ID below — we’ll ask for it when your first request comes in.'}
         </p>
+        {founding ? (
+          <p className={styles.subheading}>
+            🌟 <strong>You’re a Founding Companion</strong> — one of Konnly’s first. That means{' '}
+            <strong>no platform fee, ever</strong>. Thank you for being early.
+          </p>
+        ) : null}
+        {!fullyVerified ? <CompanionVerifyForm /> : null}
         <div className={styles.linkRow}>
           <Link href="/discover">Back to discover</Link>
         </div>
