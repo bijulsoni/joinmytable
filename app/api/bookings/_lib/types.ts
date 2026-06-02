@@ -19,6 +19,8 @@ export interface BookingDTO {
   /** See note on MealRequestDTO.counterpart_photo_urls. */
   counterpart_photo_urls: string[];
   escrow_status: EscrowStatus | null;
+  /** True once the seeker has paid the fee via Stripe Checkout. */
+  paid: boolean;
 }
 
 export interface BookingRow {

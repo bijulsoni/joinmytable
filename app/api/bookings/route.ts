@@ -33,7 +33,7 @@ interface JoinedListRow extends BookingRow {
     seeker: { name: string | null } | null;
     companion: { name: string | null } | null;
   } | null;
-  payments: Array<{ escrow_status: EscrowStatus }> | null;
+  payments: Array<{ escrow_status: EscrowStatus; paid_at: string | null }> | null;
 }
 
 function toDto(
@@ -43,6 +43,7 @@ function toDto(
   counterpartName: string | null,
   counterpartPhotoUrls: string[],
   escrowStatus: EscrowStatus | null,
+  paid: boolean,
 ): BookingDTO {
   return {
     id: row.id,
@@ -60,6 +61,7 @@ function toDto(
     counterpart_name: counterpartName,
     counterpart_photo_urls: counterpartPhotoUrls,
     escrow_status: escrowStatus,
+    paid,
   };
 }
 
@@ -233,6 +235,7 @@ export async function POST(request: NextRequest) {
         cp.users.name,
         photosByUser.get(req.companion_id) ?? [],
         'held',
+        false, // brand-new booking — seeker hasn't paid yet
       ),
     },
     { status: 201 },
@@ -254,7 +257,7 @@ export async function GET() {
          seeker:users!meal_requests_seeker_id_fkey(name),
          companion:users!meal_requests_companion_id_fkey(name)
        ),
-       payments(escrow_status)`,
+       payments(escrow_status, paid_at)`,
     )
     .order('scheduled_time', { ascending: true })
     .limit(200);
@@ -289,6 +292,7 @@ export async function GET() {
           : (row.meal_requests!.seeker?.name ?? null);
       const counterpartId = seekerId === caller.userId ? companionId : seekerId;
       const escrowStatus = (row.payments?.[0]?.escrow_status ?? null) as EscrowStatus | null;
+      const paid = Boolean(row.payments?.[0]?.paid_at);
       return toDto(
         row,
         seekerId,
@@ -296,6 +300,7 @@ export async function GET() {
         counterpartName,
         photosByUser.get(counterpartId) ?? [],
         escrowStatus,
+        paid,
       );
     });
 

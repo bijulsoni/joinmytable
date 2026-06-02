@@ -41,6 +41,8 @@ interface BookingListItem {
   status: BookingStatus;
   counterpart_name: string | null;
   counterpart_photo_urls?: string[];
+  /** True once the seeker has paid the fee. */
+  paid?: boolean;
 }
 
 interface RequestListItem {
@@ -78,6 +80,23 @@ function bookingStatusClass(status: BookingStatus): string {
       cancelled: styles.cancelled ?? '',
     }[status] ?? ''
   );
+}
+
+// A "confirmed" booking is ambiguous on its own — it means the companion
+// accepted, but the seeker may not have paid yet. Spell that out so both
+// sides can tell paid-and-ready apart from awaiting-payment.
+function bookingStatusLabel(item: BookingListItem): string {
+  if (item.status === 'confirmed') {
+    return item.paid ? 'Paid · ready to meet' : 'Accepted · awaiting payment';
+  }
+  return item.status;
+}
+
+// Confirmed-but-unpaid gets the neutral "awaiting" treatment; confirmed +
+// paid keeps the positive "confirmed" style.
+function bookingStatusVariant(item: BookingListItem): string {
+  if (item.status === 'confirmed' && !item.paid) return styles.awaiting ?? '';
+  return bookingStatusClass(item.status);
 }
 
 export function PlansList() {
@@ -362,10 +381,8 @@ export function PlansList() {
                         </p>
                         <div style={{ marginTop: '0.375rem', display: 'flex', gap: '0.375rem' }}>
                           <Badge activity={b.activity_type}>{meta.label}</Badge>
-                          <span
-                            className={[styles.statusPill, bookingStatusClass(b.status)].join(' ')}
-                          >
-                            {b.status}
+                          <span className={[styles.statusPill, bookingStatusVariant(b)].join(' ')}>
+                            {bookingStatusLabel(b)}
                           </span>
                         </div>
                       </div>
@@ -416,10 +433,8 @@ export function PlansList() {
                       </p>
                       <div style={{ marginTop: '0.375rem', display: 'flex', gap: '0.375rem' }}>
                         <Badge activity={b.activity_type}>{meta.label}</Badge>
-                        <span
-                          className={[styles.statusPill, bookingStatusClass(b.status)].join(' ')}
-                        >
-                          {b.status}
+                        <span className={[styles.statusPill, bookingStatusVariant(b)].join(' ')}>
+                          {bookingStatusLabel(b)}
                         </span>
                       </div>
                     </div>
