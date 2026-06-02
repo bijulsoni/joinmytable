@@ -282,3 +282,23 @@
   font-size: 0.9375rem;
   color: var(--color-text-secondary);
 }
+
+/* Companion's payment-status indicator on a confirmed booking. */
+.paymentPaid,
+.paymentAwaiting {
+  margin-top: 1rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.paymentPaid {
+  background: #e7f6ec;
+  color: #1f7a43;
+}
+
+.paymentAwaiting {
+  background: var(--color-surface-muted, #f4f1ec);
+  color: var(--color-text-secondary);
+}

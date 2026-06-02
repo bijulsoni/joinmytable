@@ -203,6 +203,19 @@ export default async function RequestDetailPage(ctx: RouteContext) {
           <PayButton bookingId={booking_id} paid={payment_paid} fee={fee} />
         ) : null}
 
+        {/* Companion's view: payment visibility so they can wait for the
+            seeker to pay before showing up to the meet. */}
+        {booking_id && caller_role === 'companion' && booking_status === 'confirmed' ? (
+          payment_paid ? (
+            <p className={styles.paymentPaid}>✓ Paid — you&apos;re good to meet.</p>
+          ) : (
+            <p className={styles.paymentAwaiting}>
+              ⏳ Awaiting payment from {counterpart.name ?? 'the seeker'}. It&apos;s best to wait
+              until the fee is paid before you meet.
+            </p>
+          )
+        ) : null}
+
         {booking_id ? (
           <BookingActions bookingId={booking_id} bookingStatus={booking_status} />
         ) : null}
