@@ -13,34 +13,46 @@ export default async function AdminDashboard() {
   const admin = authAdminClient();
 
   // Run the counts concurrently.
-  const [pendingVerifications, totalFeedback, totalUsers, redemptions, inviteCodes, waitlist] =
-    await Promise.all([
-      admin
-        .from('users')
-        .select('id', { count: 'exact', head: true })
-        .eq('verification_status', 'pending')
-        .then((r) => r.count ?? 0),
-      admin
-        .from('feedback_reports')
-        .select('id', { count: 'exact', head: true })
-        .then((r) => r.count ?? 0),
-      admin
-        .from('users')
-        .select('id', { count: 'exact', head: true })
-        .then((r) => r.count ?? 0),
-      admin
-        .from('invite_redemptions')
-        .select('id', { count: 'exact', head: true })
-        .then((r) => r.count ?? 0),
-      admin
-        .from('invite_codes')
-        .select('id', { count: 'exact', head: true })
-        .then((r) => r.count ?? 0),
-      admin
-        .from('waitlist')
-        .select('id', { count: 'exact', head: true })
-        .then((r) => r.count ?? 0),
-    ]);
+  const [
+    pendingVerifications,
+    totalFeedback,
+    totalUsers,
+    redemptions,
+    inviteCodes,
+    waitlist,
+    activeBookings,
+  ] = await Promise.all([
+    admin
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('verification_status', 'pending')
+      .then((r) => r.count ?? 0),
+    admin
+      .from('feedback_reports')
+      .select('id', { count: 'exact', head: true })
+      .then((r) => r.count ?? 0),
+    admin
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .then((r) => r.count ?? 0),
+    admin
+      .from('invite_redemptions')
+      .select('id', { count: 'exact', head: true })
+      .then((r) => r.count ?? 0),
+    admin
+      .from('invite_codes')
+      .select('id', { count: 'exact', head: true })
+      .then((r) => r.count ?? 0),
+    admin
+      .from('waitlist')
+      .select('id', { count: 'exact', head: true })
+      .then((r) => r.count ?? 0),
+    admin
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'completed')
+      .then((r) => r.count ?? 0),
+  ]);
 
   const cards = [
     {
@@ -67,6 +79,13 @@ export default async function AdminDashboard() {
       label: 'Total members',
       value: totalUsers,
       hint: 'All registered accounts',
+    },
+    {
+      href: '/admin/bookings',
+      label: 'Completed meets',
+      value: activeBookings,
+      hint: activeBookings > 0 ? 'May need payouts' : 'No meets yet',
+      urgent: activeBookings > 0,
     },
     {
       href: '/admin/waitlist',

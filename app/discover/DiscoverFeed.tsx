@@ -430,12 +430,12 @@ export function DiscoverFeed({ companions: seedCompanions, fetchError: seedError
           </div>
           <h2 className={styles.emptyTitle}>
             {location.status === 'granted'
-              ? `No companions within ${radiusMi} mi`
+              ? `No companions within ${radiusMi} mi yet`
               : 'No companions match these filters'}
           </h2>
           <p className={styles.emptyText}>
             {location.status === 'granted'
-              ? 'Try widening the radius or clearing the activity filter.'
+              ? "We're just getting started in your area and new companions are joining every week. Try widening your radius or clearing filters — and check back soon."
               : 'Try a different activity or clear the area filter.'}
           </p>
           <button
