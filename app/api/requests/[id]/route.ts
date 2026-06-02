@@ -51,7 +51,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       `*,
        seeker:users!meal_requests_seeker_id_fkey(id, name, email),
        companion:users!meal_requests_companion_id_fkey(id, name, email),
-       bookings!bookings_request_id_fkey(id)`,
+       bookings!bookings_request_id_fkey(id, status)`,
     )
     .eq('id', id)
     .maybeSingle();
@@ -61,7 +61,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const row = reqRaw as unknown as MealRequestRow & {
     seeker: { id: string; name: string | null; email: string | null } | null;
     companion: { id: string; name: string | null; email: string | null } | null;
-    bookings: Array<{ id: string }> | { id: string } | null;
+    bookings: Array<{ id: string; status: string }> | { id: string; status: string } | null;
   };
 
   // Participant gate (would normally be enforced by RLS, but we
@@ -75,9 +75,9 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const counterpartUser = callerRole === 'seeker' ? row.companion : row.seeker;
   const counterpartId = counterpartUser?.id ?? null;
   const counterpartName = counterpartUser?.name ?? null;
-  const bookingId = Array.isArray(row.bookings)
-    ? (row.bookings[0]?.id ?? null)
-    : (row.bookings?.id ?? null);
+  const bookingRow = Array.isArray(row.bookings) ? (row.bookings[0] ?? null) : row.bookings;
+  const bookingId = bookingRow?.id ?? null;
+  const bookingStatus = bookingRow?.status ?? null;
 
   // Fetch the counterpart's companion profile if they have one — gives
   // us bio, photo, rating, service area for the detail page.
@@ -158,6 +158,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     },
     caller_role: callerRole,
     booking_id: bookingId,
+    booking_status: bookingStatus,
   });
 }
 

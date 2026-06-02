@@ -268,3 +268,17 @@
   color: var(--color-danger);
   font-size: 0.875rem;
 }
+
+/* Booking lifecycle actions (We met / Cancel) on a confirmed booking. */
+.bookingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-top: 1rem;
+}
+
+.bookingDone {
+  margin-top: 1rem;
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+}
