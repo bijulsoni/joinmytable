@@ -15,6 +15,7 @@ import {
 } from '@/lib/types';
 import { RespondActions } from './RespondActions';
 import { BookingActions } from './BookingActions';
+import { PayButton } from './PayButton';
 import styles from './styles.module.css';
 
 export const metadata: Metadata = {
@@ -54,6 +55,7 @@ interface RequestDetailResponse {
   caller_role: 'seeker' | 'companion';
   booking_id: string | null;
   booking_status: string | null;
+  payment_paid: boolean;
 }
 
 async function loadDetail(id: string): Promise<RequestDetailResponse | null> {
@@ -113,7 +115,8 @@ export default async function RequestDetailPage(ctx: RouteContext) {
     );
   }
 
-  const { request: r, counterpart, caller_role, booking_id, booking_status } = data;
+  const { request: r, counterpart, caller_role, booking_id, booking_status, payment_paid } = data;
+  const fee = counterpart.rates[r.activity_type] ?? null;
   const activityMeta = ACTIVITY_TYPE_META[r.activity_type];
   const counterpartLabel = caller_role === 'seeker' ? 'Companion' : 'Seeker';
 
@@ -195,6 +198,10 @@ export default async function RequestDetailPage(ctx: RouteContext) {
           bookingId={booking_id}
           companionUserId={r.companion_id}
         />
+
+        {booking_id && caller_role === 'seeker' && booking_status === 'confirmed' ? (
+          <PayButton bookingId={booking_id} paid={payment_paid} fee={fee} />
+        ) : null}
 
         {booking_id ? (
           <BookingActions bookingId={booking_id} bookingStatus={booking_status} />

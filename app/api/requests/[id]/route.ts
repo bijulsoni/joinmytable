@@ -79,6 +79,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const bookingId = bookingRow?.id ?? null;
   const bookingStatus = bookingRow?.status ?? null;
 
+  // Has the seeker paid? Drives the "Pay" button on the booking detail.
+  let paymentPaid = false;
+  if (bookingId) {
+    const { data: payRow } = await admin
+      .from('payments')
+      .select('paid_at')
+      .eq('booking_id', bookingId)
+      .maybeSingle();
+    paymentPaid = Boolean((payRow as { paid_at: string | null } | null)?.paid_at);
+  }
+
   // Fetch the counterpart's companion profile if they have one — gives
   // us bio, photo, rating, service area for the detail page.
   let counterpartProfile: {
@@ -159,6 +170,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     caller_role: callerRole,
     booking_id: bookingId,
     booking_status: bookingStatus,
+    payment_paid: paymentPaid,
   });
 }
 
