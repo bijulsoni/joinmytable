@@ -13,5 +13,9 @@ export { mealReminderTemplate, type MealReminderData } from './meal-reminder';
 export { paymentConfirmedTemplate, type PaymentConfirmedData } from './payment-confirmed';
 export { bookingCompletedTemplate, type BookingCompletedData } from './booking-completed';
 export { reviewPromptTemplate, type ReviewPromptData } from './review-prompt';
+export {
+  verificationApprovedTemplate,
+  type VerificationApprovedData,
+} from './verification-approved';
 
 export type { EmailContent, EmailTemplate } from './_shared';

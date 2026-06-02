@@ -24,7 +24,8 @@ export type NotificationEvent =
   | 'payment_confirmed'
   | 'meal_reminder'
   | 'booking_completed'
-  | 'review_prompt';
+  | 'review_prompt'
+  | 'verification_approved';
 
 // Map snake_case events to the camelCase template export names.
 const TEMPLATE_KEY: Record<NotificationEvent, keyof typeof templates> = {
@@ -36,6 +37,7 @@ const TEMPLATE_KEY: Record<NotificationEvent, keyof typeof templates> = {
   meal_reminder: 'mealReminderTemplate',
   booking_completed: 'bookingCompletedTemplate',
   review_prompt: 'reviewPromptTemplate',
+  verification_approved: 'verificationApprovedTemplate',
 };
 
 export interface NotifyPayload {

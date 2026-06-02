@@ -20,6 +20,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/auth/admin';
 import { authAdminClient } from '@/lib/auth/db';
+import { notify } from '@/lib/notifications';
 import { logger } from '@/lib/logger';
 
 const log = logger.child({ module: 'admin-verifications' });
@@ -95,6 +96,18 @@ export async function decideVerificationAction(
   if (uErr) {
     log.error({ err: uErr.message, userId, decision }, 'users update failed');
     return { ok: false, error: 'Could not update the account status. Please try again.' };
+  }
+
+  // Email the companion that they're live (tier-aware + founding). Fire
+  // only on approval; best-effort (never blocks the decision).
+  if (decision !== 'reject') {
+    void notify('verification_approved', {
+      recipient_user_id: userId,
+      data: {
+        tier: decision === 'approve_full' ? 'full' : 'basic',
+        founding: cpPatch.is_founding === true,
+      },
+    });
   }
 
   log.info({ userId, decision }, 'verification decided');
