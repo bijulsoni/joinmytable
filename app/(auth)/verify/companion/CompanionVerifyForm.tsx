@@ -41,6 +41,36 @@ export function CompanionVerifyForm() {
       </div>
 
       <div className={styles.field}>
+        <label htmlFor="payoutMethod" className={styles.label}>
+          How should we pay you?
+        </label>
+        <select id="payoutMethod" name="payoutMethod" className={styles.input} defaultValue="venmo">
+          <option value="venmo">Venmo</option>
+          <option value="zelle">Zelle</option>
+          <option value="paypal">PayPal</option>
+        </select>
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="payoutHandle" className={styles.label}>
+          Your payout handle
+        </label>
+        <input
+          id="payoutHandle"
+          name="payoutHandle"
+          type="text"
+          maxLength={120}
+          autoComplete="off"
+          placeholder="@your-venmo, phone, or email"
+          className={styles.input}
+        />
+        <p className={styles.helpText}>
+          This is how we&apos;ll send your fee after each meet. Only the Konnly team sees it — never
+          other members.
+        </p>
+      </div>
+
+      <div className={styles.field}>
         <label htmlFor="legalName" className={styles.label}>
           Full legal name (optional — for ID step)
         </label>

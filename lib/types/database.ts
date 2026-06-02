@@ -102,6 +102,10 @@ export interface CompanionProfileRow {
   id_verified_at: string | null;
   /** Founding Companion (first 100 verified). Perk: no platform fee. */
   is_founding: boolean;
+  /** Payout method (venmo|zelle|paypal) + handle. Admin-only — never in
+   *  any seeker-facing select. */
+  payout_method: string | null;
+  payout_handle: string | null;
   created_at: string;
 }
 

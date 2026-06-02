@@ -77,3 +77,39 @@ export async function submitCompanionVerification(
     status: (updated as { verification_status: VerificationStatus }).verification_status,
   };
 }
+
+/**
+ * Save the companion's payout details on their companion_profiles row
+ * (creating the row if it doesn't exist yet). Admin-only data — never
+ * surfaced to seekers. Best-effort; returns ok/false without throwing.
+ */
+export async function saveCompanionPayout(input: {
+  method: 'venmo' | 'zelle' | 'paypal';
+  handle: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await authServerClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: 'Not signed in.' };
+  const userId = auth.user.id;
+
+  const patch = { payout_method: input.method, payout_handle: input.handle.trim() };
+
+  // No unique constraint on companion_profiles.user_id, so select-then-
+  // write rather than upsert (mirrors the /welcome onboarding action).
+  const { data: existing } = await supabase
+    .from('companion_profiles')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase.from('companion_profiles').update(patch).eq('user_id', userId);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { error } = await supabase
+      .from('companion_profiles')
+      .insert({ user_id: userId, ...patch });
+    if (error) return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}

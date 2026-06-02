@@ -7,6 +7,7 @@ import {
   type BookingStatus,
   type EscrowStatus,
 } from '@/lib/types';
+import { AdminBookingActions } from './AdminBookingActions';
 import shared from '../styles.module.css';
 
 export const metadata: Metadata = { title: 'Bookings · Admin' };
@@ -31,6 +32,7 @@ interface BookingRow {
   status: BookingStatus;
   created_at: string;
   meal_requests: {
+    companion_id: string | null;
     seeker: { name: string | null } | null;
     companion: { name: string | null } | null;
   } | null;
@@ -96,6 +98,7 @@ export default async function AdminBookingsPage() {
     .select(
       `id, activity_type, venue_name, scheduled_time, companion_fee, status, created_at,
        meal_requests!bookings_request_id_fkey(
+         companion_id,
          seeker:users!meal_requests_seeker_id_fkey(name),
          companion:users!meal_requests_companion_id_fkey(name)
        )`,
@@ -116,6 +119,28 @@ export default async function AdminBookingsPage() {
       .in('booking_id', bookingIds);
     for (const p of (paymentsData ?? []) as PaymentRow[]) {
       if (p.paid_at) paidAtByBooking.set(p.booking_id, p.paid_at);
+    }
+  }
+
+  // Companion payout handles (admin-only) so the Payout cell can say
+  // exactly where to send the money — no chasing the companion for it.
+  const payoutByCompanion = new Map<string, { method: string | null; handle: string | null }>();
+  const companionIds = [
+    ...new Set(
+      bookings.map((b) => b.meal_requests?.companion_id).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  if (companionIds.length > 0) {
+    const { data: profs } = await admin
+      .from('companion_profiles')
+      .select('user_id, payout_method, payout_handle')
+      .in('user_id', companionIds);
+    for (const p of (profs ?? []) as Array<{
+      user_id: string;
+      payout_method: string | null;
+      payout_handle: string | null;
+    }>) {
+      payoutByCompanion.set(p.user_id, { method: p.payout_method, handle: p.payout_handle });
     }
   }
 
@@ -170,6 +195,7 @@ export default async function AdminBookingsPage() {
                 <th>Status</th>
                 <th>Seeker paid?</th>
                 <th>Payout</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -199,10 +225,16 @@ export default async function AdminBookingsPage() {
                 }
 
                 // Payout hint: a completed booking with the fee collected is
-                // a companion you owe (manual Venmo/Zelle).
+                // a companion you owe. Show their handle so you can pay
+                // directly — no chasing.
                 let payout = '—';
                 if (b.status === 'completed') {
-                  payout = '⏳ Pay companion via Venmo/Zelle';
+                  const po = b.meal_requests?.companion_id
+                    ? payoutByCompanion.get(b.meal_requests.companion_id)
+                    : undefined;
+                  payout = po?.handle
+                    ? `⏳ ${formatFee(b.companion_fee)} → ${po.method ?? 'pay'} ${po.handle}`
+                    : '⏳ Pay companion (no payout handle on file)';
                 }
 
                 return (
@@ -217,6 +249,9 @@ export default async function AdminBookingsPage() {
                     </td>
                     <td>{paidCell}</td>
                     <td>{payout}</td>
+                    <td>
+                      {b.status === 'confirmed' ? <AdminBookingActions bookingId={b.id} /> : '—'}
+                    </td>
                   </tr>
                 );
               })}

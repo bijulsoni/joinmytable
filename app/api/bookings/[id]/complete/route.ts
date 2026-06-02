@@ -50,6 +50,16 @@ export async function PATCH(_req: Request, ctx: { params: Promise<{ id: string }
   if (!booking.meal_requests) {
     return apiError('not_found', 'Booking is missing its request linkage.');
   }
+  // Only the SEEKER confirms completion — they're the one attesting the
+  // companion delivered (the companion confirming their own payout is a
+  // conflict of interest). If a seeker goes silent, an admin can override
+  // from the admin Bookings console.
+  if (booking.meal_requests.seeker_id !== caller.userId) {
+    return apiError(
+      'forbidden',
+      'Only the seeker can mark this complete. If they’re unresponsive, contact Konnly and we’ll sort it out.',
+    );
+  }
   if (booking.status !== 'confirmed') {
     return apiError('conflict', `Cannot complete a booking in '${booking.status}' state.`);
   }

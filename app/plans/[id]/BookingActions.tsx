@@ -18,9 +18,12 @@ import styles from './styles.module.css';
 interface Props {
   bookingId: string;
   bookingStatus: string | null;
+  /** Only the seeker sees "mark complete"; the companion sees a note. */
+  callerRole: 'seeker' | 'companion';
+  counterpartName?: string | null;
 }
 
-export function BookingActions({ bookingId, bookingStatus }: Props) {
+export function BookingActions({ bookingId, bookingStatus, callerRole, counterpartName }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<'complete' | 'cancel' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +37,8 @@ export function BookingActions({ bookingId, bookingStatus }: Props) {
     }
     return null;
   }
+
+  const isSeeker = callerRole === 'seeker';
 
   async function act(kind: 'complete' | 'cancel') {
     if (kind === 'cancel' && !window.confirm('Cancel this booking? The fee is refunded.')) return;
@@ -57,14 +62,21 @@ export function BookingActions({ bookingId, bookingStatus }: Props) {
 
   return (
     <section className={styles.bookingActions}>
-      <Button
-        variant="primary"
-        loading={busy === 'complete'}
-        disabled={busy !== null}
-        onClick={() => void act('complete')}
-      >
-        We met — mark complete
-      </Button>
+      {isSeeker ? (
+        <Button
+          variant="primary"
+          loading={busy === 'complete'}
+          disabled={busy !== null}
+          onClick={() => void act('complete')}
+        >
+          We met — mark complete
+        </Button>
+      ) : (
+        <p className={styles.bookingDone}>
+          After you meet, {counterpartName ?? 'the seeker'} confirms it complete to release your
+          payment. If they don&apos;t, contact Konnly and we&apos;ll sort it out.
+        </p>
+      )}
       <Button
         variant="secondary"
         loading={busy === 'cancel'}

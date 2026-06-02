@@ -217,7 +217,12 @@ export default async function RequestDetailPage(ctx: RouteContext) {
         ) : null}
 
         {booking_id ? (
-          <BookingActions bookingId={booking_id} bookingStatus={booking_status} />
+          <BookingActions
+            bookingId={booking_id}
+            bookingStatus={booking_status}
+            callerRole={caller_role}
+            counterpartName={counterpart.name}
+          />
         ) : null}
       </main>
     </AppShell>
