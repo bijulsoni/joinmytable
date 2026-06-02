@@ -31,7 +31,11 @@ export const resend = (() => {
   }
 })() as Resend | null;
 
-export const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'hello@konnly.co';
+// `RESEND_FROM` is the documented var (see docs/SETUP-resend-stripe.md) and
+// accepts the "Name <email>" form. RESEND_FROM_EMAIL is kept as a fallback
+// for any older config. Default points at the verified konnly.com domain.
+export const FROM_EMAIL =
+  process.env.RESEND_FROM ?? process.env.RESEND_FROM_EMAIL ?? 'Konnly <hello@konnly.com>';
 
 /** True only when the Resend API key is configured. */
 export function isEmailConfigured(): boolean {
