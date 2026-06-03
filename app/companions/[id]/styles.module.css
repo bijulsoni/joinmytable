@@ -40,21 +40,21 @@
   transform: translateX(-1px);
 }
 
-/* Hero card: square photo on the left + name/meta on the right. No more
-   stretched banner — portrait phone photos used to get cropped to just
-   the eyes/nose. Object-position center 30% keeps faces roughly in
-   frame for the typical "head + shoulders" photo composition. */
+/* Single swipeable photo gallery — every photo is an equal full-width
+   slide in one carousel, dots below. Replaces the old hero+strip split,
+   which made a similar first/second photo read as "loaded twice".
+   Constrained to a centered column so a portrait photo doesn't blow up
+   to full viewport width on desktop. */
 
-.heroCard {
-  margin: 1rem 1.25rem 0.875rem;
-  padding: 1rem;
+.galleryCard {
+  width: calc(100% - 2.5rem);
+  max-width: 440px;
+  margin: 1rem auto 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
+  overflow: hidden;
   animation: cardEnter var(--duration-slow) var(--ease-spring);
 }
 
@@ -69,37 +69,44 @@
   }
 }
 
-/* Wraps the hero photo in a clickable button — opens the lightbox. */
-.heroPhotoButton {
+.galleryViewport {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.galleryViewport::-webkit-scrollbar {
+  display: none;
+}
+
+/* Each photo is a full-width slide; clicking opens the lightbox. */
+.gallerySlideButton {
   appearance: none;
   border: 0;
   padding: 0;
+  margin: 0;
   background: transparent;
   cursor: zoom-in;
-  border-radius: var(--radius-lg);
-  flex: 0 0 auto;
-  transition: transform var(--duration-base) var(--ease-spring);
+  flex: 0 0 100%;
+  width: 100%;
+  scroll-snap-align: start;
 }
 
-.heroPhotoButton:hover {
-  transform: scale(1.02);
-}
-
-.heroPhotoButton:focus-visible {
+.gallerySlideButton:focus-visible {
   outline: none;
-  box-shadow: var(--shadow-focus);
+  box-shadow: inset 0 0 0 3px var(--color-focus, rgba(20, 16, 12, 0.45));
 }
 
-.heroPhoto {
-  width: 120px;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+.gallerySlide {
+  width: 100%;
+  aspect-ratio: 4 / 5;
   background: var(--color-surface-muted);
-  box-shadow: var(--shadow-xs);
+  overflow: hidden;
 }
 
-.heroPhoto img {
+.gallerySlide img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -107,15 +114,13 @@
   display: block;
 }
 
-.heroPhotoFallback {
-  flex: 0 0 auto;
-  width: 120px;
-  height: 120px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--color-surface-muted), var(--color-border));
+.galleryFallback {
+  width: 100%;
+  aspect-ratio: 4 / 5;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: linear-gradient(135deg, var(--color-surface-muted), var(--color-border));
 }
 
 .heroInfo {
@@ -211,59 +216,41 @@
   font-weight: 600;
 }
 
-/* Horizontal scrolling strip of additional photos (everything past
-   index 0; index 0 is the hero shown above). */
-
-.gallery {
+/* Carousel position indicator — one dot per photo, active one widens. */
+.galleryDots {
   display: flex;
-  gap: 0.5rem;
-  padding: 0 1.25rem 0.5rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
+  justify-content: center;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 0 0.5rem;
 }
 
-.gallery::-webkit-scrollbar {
-  display: none;
+.galleryDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border);
+  transition:
+    width var(--duration-base) var(--ease-out),
+    background var(--duration-base) var(--ease-out);
 }
 
-/* Gallery thumbnails are buttons too. */
-.galleryTileButton {
-  appearance: none;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: zoom-in;
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  border-radius: var(--radius-md);
-  transition: transform var(--duration-base) var(--ease-spring);
+.galleryDotActive {
+  width: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent, var(--color-text-primary));
 }
 
-.galleryTileButton:hover {
-  transform: scale(1.04);
-}
-
-.galleryTileButton:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
-}
-
-.galleryTile {
-  width: 96px;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: var(--color-surface-muted);
+/* Identity block, below the gallery: name, badges, rating, location. */
+.metaCard {
+  width: calc(100% - 2.5rem);
+  max-width: 440px;
+  margin: 0.875rem auto 0;
+  padding: 1rem 1.125rem;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-}
-
-.galleryTile img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 30%;
-  display: block;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
 }
 
 .section {

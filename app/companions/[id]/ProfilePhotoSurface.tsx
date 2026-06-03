@@ -2,18 +2,19 @@
 
 // Photo surface for the companion profile page.
 //
-// Owns three things:
-//   1. The hero photo (clickable, opens lightbox at index 0)
-//   2. The horizontal gallery strip of additional photos (each
-//      thumbnail clickable, opens lightbox at its index)
-//   3. The PhotoLightbox modal itself
+// A SINGLE swipeable gallery — every photo is an equal, full-width slide
+// in one horizontal scroll-snap carousel, with dots underneath. There is
+// no separate "hero + strip-of-the-rest" split anymore: that made a
+// companion's first photo look duplicated whenever their next photo was a
+// similar shot (big photo on top + a near-identical thumbnail below read
+// as "loaded twice"). One carousel shows each photo exactly once.
 //
-// The `meta` slot carries the name/verified/rating block from the
-// server component so it can render alongside the hero photo in the
-// same flex card without forcing the entire heroCard to be a client
-// component.
+// Tapping any slide opens the PhotoLightbox at that index.
+//
+// The `meta` slot carries the name/verified/rating block from the server
+// component; it now renders in its own card BELOW the gallery.
 
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { Avatar } from '@/components/ui';
 import { PhotoLightbox } from '@/components/photo/PhotoLightbox';
 import styles from './styles.module.css';
@@ -26,50 +27,58 @@ interface Props {
 
 export function ProfilePhotoSurface({ photos, name, meta }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const hero = photos[0] ?? null;
-  const more = photos.slice(1);
+  const [active, setActive] = useState(0);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  // Derive the active slide from scroll position so the dots track swipes.
+  function onScroll() {
+    const el = viewportRef.current;
+    if (!el) return;
+    const slide = el.clientWidth || 1;
+    const next = Math.round(el.scrollLeft / slide);
+    if (next !== active) setActive(next);
+  }
 
   return (
     <>
-      <section className={styles.heroCard}>
-        {hero ? (
-          <button
-            type="button"
-            className={styles.heroPhotoButton}
-            onClick={() => setLightboxIndex(0)}
-            aria-label={`Open ${name}'s photos`}
-          >
-            <div className={styles.heroPhoto}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={hero} alt={`${name}'s photo`} />
+      <section className={styles.galleryCard}>
+        {photos.length > 0 ? (
+          <>
+            <div className={styles.galleryViewport} ref={viewportRef} onScroll={onScroll}>
+              {photos.map((url, i) => (
+                <button
+                  key={url}
+                  type="button"
+                  className={styles.gallerySlideButton}
+                  onClick={() => setLightboxIndex(i)}
+                  aria-label={`Open photo ${i + 1} of ${photos.length}`}
+                >
+                  <div className={styles.gallerySlide}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`${name}'s photo ${i + 1}`} />
+                  </div>
+                </button>
+              ))}
             </div>
-          </button>
+            {photos.length > 1 ? (
+              <div className={styles.galleryDots} aria-hidden>
+                {photos.map((url, i) => (
+                  <span
+                    key={url}
+                    className={`${styles.galleryDot} ${i === active ? styles.galleryDotActive : ''}`}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </>
         ) : (
-          <div className={styles.heroPhotoFallback} aria-hidden>
-            <Avatar src={null} name={name} size={72} />
+          <div className={styles.galleryFallback} aria-hidden>
+            <Avatar src={null} name={name} size={96} />
           </div>
         )}
-        {meta}
       </section>
 
-      {more.length > 0 ? (
-        <section className={styles.gallery} aria-label="More photos">
-          {more.map((url, i) => (
-            <button
-              key={url}
-              type="button"
-              className={styles.galleryTileButton}
-              onClick={() => setLightboxIndex(i + 1)}
-              aria-label={`Open photo ${i + 2}`}
-            >
-              <div className={styles.galleryTile}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="" />
-              </div>
-            </button>
-          ))}
-        </section>
-      ) : null}
+      <section className={styles.metaCard}>{meta}</section>
 
       {lightboxIndex !== null ? (
         <PhotoLightbox
