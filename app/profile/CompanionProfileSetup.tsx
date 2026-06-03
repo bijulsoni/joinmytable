@@ -47,7 +47,11 @@ interface ProfileDTO {
   rates?: Partial<Record<ActivityType, number>>;
   photo_urls?: string[];
   account_verification_status?: 'unverified' | 'pending' | 'verified';
+  payout_method?: string | null;
+  payout_handle?: string | null;
 }
+
+type PayoutMethod = 'venmo' | 'zelle' | 'paypal';
 
 interface FormValues {
   bio: string;
@@ -57,6 +61,8 @@ interface FormValues {
   paidCompanionOn: boolean;
   activities: Record<ActivityType, boolean>;
   rates: Record<ActivityType, string>;
+  payoutMethod: PayoutMethod;
+  payoutHandle: string;
 }
 
 function blankForm(): FormValues {
@@ -71,6 +77,8 @@ function blankForm(): FormValues {
       coffee: String(ACTIVITY_TYPE_META.coffee.suggestedFeeUsd.min + 2),
       happy_hour: String(ACTIVITY_TYPE_META.happy_hour.suggestedFeeUsd.min + 2),
     },
+    payoutMethod: 'venmo',
+    payoutHandle: '',
   };
 }
 
@@ -98,6 +106,9 @@ function dtoToForm(dto: ProfileDTO): FormValues {
       },
       { ...base.rates },
     ),
+    payoutMethod:
+      dto.payout_method === 'zelle' || dto.payout_method === 'paypal' ? dto.payout_method : 'venmo',
+    payoutHandle: dto.payout_handle ?? '',
   };
 }
 
@@ -329,6 +340,8 @@ export function ProfileSetup() {
         service_area: form.service_area.trim() || null,
         activities,
         rates,
+        payout_method: form.payoutMethod,
+        payout_handle: form.payoutHandle.trim() || null,
       };
       if (pendingLocation) {
         payload.location = pendingLocation;
@@ -545,6 +558,42 @@ export function ProfileSetup() {
               </div>
             );
           })}
+        </div>
+      ) : null}
+
+      {form.paidCompanionOn ? (
+        <div className={styles.payoutBlock}>
+          <label className={styles.label} htmlFor="payoutMethod">
+            How should we pay you?
+          </label>
+          <select
+            id="payoutMethod"
+            className={styles.input}
+            value={form.payoutMethod}
+            onChange={(e) => setForm({ ...form, payoutMethod: e.target.value as PayoutMethod })}
+          >
+            <option value="venmo">Venmo</option>
+            <option value="zelle">Zelle</option>
+            <option value="paypal">PayPal</option>
+          </select>
+
+          <label className={styles.label} htmlFor="payoutHandle">
+            Your payout handle
+          </label>
+          <input
+            id="payoutHandle"
+            type="text"
+            maxLength={120}
+            autoComplete="off"
+            placeholder="@your-venmo, phone, or email"
+            className={styles.input}
+            value={form.payoutHandle}
+            onChange={(e) => setForm({ ...form, payoutHandle: e.target.value })}
+          />
+          <p className={styles.helpText}>
+            This is how we send your fee after each meet. Only the Konnly team sees it — never other
+            members.
+          </p>
         </div>
       ) : null}
 

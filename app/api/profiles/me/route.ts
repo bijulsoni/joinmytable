@@ -72,6 +72,12 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   if (input.service_area !== undefined) writable.service_area = input.service_area;
   if (input.activities !== undefined) writable.activities = input.activities;
   if (input.rates !== undefined) writable.rates = input.rates;
+  if (input.payout_method !== undefined) {
+    (writable as Record<string, unknown>).payout_method = input.payout_method;
+  }
+  if (input.payout_handle !== undefined) {
+    (writable as Record<string, unknown>).payout_handle = input.payout_handle;
+  }
   // PostGIS geography(Point, 4326) doesn't accept raw GeoJSON via PostgREST —
   // it expects EWKT (`SRID=4326;POINT(lng lat)`). The validator accepts the
   // friendlier GeoJSON shape on the wire and we convert here. Cast through

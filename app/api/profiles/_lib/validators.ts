@@ -78,6 +78,8 @@ export const companionProfileUpsertSchema = z
     location: geoJSONPointSchema.nullable().optional(),
     activities: activitiesMapSchema.optional(),
     rates: ratesMapSchema.optional(),
+    payout_method: z.enum(['venmo', 'zelle', 'paypal']).nullable().optional(),
+    payout_handle: z.string().trim().max(120).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: 'Provide at least one field.',

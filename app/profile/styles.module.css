@@ -623,3 +623,11 @@
 .locationStatusWarn {
   color: var(--color-warning, var(--color-text-secondary));
 }
+
+/* Payout details block in the paid-companion section. */
+.payoutBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}

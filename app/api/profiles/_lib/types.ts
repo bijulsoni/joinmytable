@@ -54,6 +54,9 @@ export interface OwnCompanionProfileDTO {
   rating_avg: string;
   /** ISO timestamp when the companion profile was approved; null = unverified. */
   verified_at: string | null;
+  /** Payout details (own view only). How the companion gets paid. */
+  payout_method: string | null;
+  payout_handle: string | null;
   created_at: string;
 }
 
@@ -128,6 +131,8 @@ export function toOwnCompanionProfileDTO(
     photo_urls: normalizePhotos(profile.photo_urls),
     rating_avg: profile.rating_avg,
     verified_at: profile.verified_at,
+    payout_method: profile.payout_method,
+    payout_handle: profile.payout_handle,
     created_at: profile.created_at,
   };
 }
