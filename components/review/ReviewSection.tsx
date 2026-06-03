@@ -160,8 +160,8 @@ export function ReviewSection({ bookingId }: { bookingId: string }) {
       ) : (
         <>
           <p className={styles.sub}>
-            How was your time with {them}? Reviews are private until both sides submit or a few days
-            pass, and they’re always two-way.
+            How was your time with {them}? Your rating and note show on their profile, and reviews
+            are always two-way — they can review you too.
           </p>
           <div
             className={styles.picker}
