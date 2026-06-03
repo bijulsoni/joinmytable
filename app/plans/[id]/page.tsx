@@ -16,6 +16,7 @@ import {
 import { RespondActions } from './RespondActions';
 import { BookingActions } from './BookingActions';
 import { PayButton } from './PayButton';
+import { ReviewSection } from '@/components/review/ReviewSection';
 import styles from './styles.module.css';
 
 export const metadata: Metadata = {
@@ -223,6 +224,11 @@ export default async function RequestDetailPage(ctx: RouteContext) {
             callerRole={caller_role}
             counterpartName={counterpart.name}
           />
+        ) : null}
+
+        {/* Two-way reviews unlock once the booking is complete (rule #9). */}
+        {booking_id && booking_status === 'completed' ? (
+          <ReviewSection bookingId={booking_id} />
         ) : null}
       </main>
     </AppShell>

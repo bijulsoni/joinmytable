@@ -1,0 +1,26 @@
+.shell {
+  min-height: 100dvh;
+  background: var(--gradient-hero, var(--color-background));
+  background-attachment: fixed;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 5.5rem;
+}
+
+.header {
+  padding: 1rem 1.25rem 0;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--color-text-primary);
+}

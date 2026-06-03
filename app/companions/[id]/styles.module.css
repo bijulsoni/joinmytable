@@ -240,6 +240,51 @@
   letter-spacing: -0.005em;
 }
 
+/* -------- Reviews list -------- */
+.reviewsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.reviewItem {
+  padding: 0.875rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.reviewHead {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.reviewName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.reviewDate {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.reviewComment {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
 .ratesList {
   display: flex;
   flex-direction: column;

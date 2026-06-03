@@ -9,6 +9,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { loadPublicCompanionProfile } from '@/app/api/profiles/_lib/load';
 import { RequestComposer } from './RequestComposer';
 import { ProfilePhotoSurface } from './ProfilePhotoSurface';
+import { Stars } from '@/components/review/Stars';
 import { ACTIVITY_TYPES } from '@/lib/types';
 import type { LooseSupabaseClient } from '@/app/api/_lib';
 import type { PublicCompanionProfileDTO } from '@/app/api/profiles/_lib/types';
@@ -71,6 +72,45 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
   }
 
   const offered = ACTIVITY_TYPES.filter((a) => profile.activities[a]);
+
+  // Recent reviews for this companion (reviewee = their user id). Public-
+  // read; best-effort so a reviews hiccup never blocks the profile.
+  interface ProfileReview {
+    id: string;
+    rating: number;
+    comment: string | null;
+    created_at: string;
+    reviewer_name: string;
+  }
+  let reviews: ProfileReview[] = [];
+  try {
+    const sb = (await createSupabaseServerClient()) as unknown as LooseSupabaseClient;
+    const { data } = await sb
+      .from('reviews')
+      .select('id, rating, comment, created_at, reviewer:users!reviews_reviewer_id_fkey(name)')
+      .eq('reviewee_id', id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    reviews = ((data as unknown[] | null) ?? []).map((row) => {
+      const r = row as {
+        id: string;
+        rating: number;
+        comment: string | null;
+        created_at: string;
+        reviewer: { name: string | null }[] | { name: string | null } | null;
+      };
+      const rev = Array.isArray(r.reviewer) ? r.reviewer[0] : r.reviewer;
+      return {
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        created_at: r.created_at,
+        reviewer_name: rev?.name ?? 'Someone',
+      };
+    });
+  } catch {
+    // ignore — reviews are non-essential to the profile render
+  }
 
   return (
     <AppShell loginRedirectTo={`/companions/${id}`}>
@@ -146,6 +186,31 @@ export default async function CompanionPublicProfilePage(ctx: RouteContext) {
             </summary>
             <p className={styles.bio}>{profile.bio}</p>
           </details>
+        ) : null}
+
+        {reviews.length > 0 ? (
+          <section className={styles.section} aria-labelledby="reviews-heading">
+            <h2 id="reviews-heading" className={styles.sectionHeading}>
+              Reviews ({reviews.length})
+            </h2>
+            <ul className={styles.reviewsList}>
+              {reviews.map((rv) => (
+                <li key={rv.id} className={styles.reviewItem}>
+                  <div className={styles.reviewHead}>
+                    <Stars value={rv.rating} />
+                    <span className={styles.reviewName}>{rv.reviewer_name}</span>
+                    <span className={styles.reviewDate}>
+                      {new Date(rv.created_at).toLocaleDateString(undefined, {
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                  {rv.comment ? <p className={styles.reviewComment}>“{rv.comment}”</p> : null}
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
       </main>
     </AppShell>
