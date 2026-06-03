@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, type FormEvent } from 'react';
+import { useState, useTransition, type FormEvent } from 'react';
 import { submitCompanionVerificationAction, type CompanionVerifyState } from './actions';
 import styles from '../../styles.module.css';
 
@@ -34,50 +34,52 @@ async function downscaleImage(file: File): Promise<Blob> {
 }
 
 export function CompanionVerifyForm() {
-  const [state, formAction, isPending] = useActionState(submitCompanionVerificationAction, INITIAL);
-  const [clientError, setClientError] = useState<string | null>(null);
-  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setClientError(null);
+    setError(null);
     const form = e.currentTarget;
 
-    const selfieInput = form.elements.namedItem('selfie') as HTMLInputElement | null;
-    const docInput = form.elements.namedItem('document') as HTMLInputElement | null;
-    const selfieFile = selfieInput?.files?.[0] ?? null;
+    const selfieFile =
+      (form.elements.namedItem('selfie') as HTMLInputElement | null)?.files?.[0] ?? null;
     if (!selfieFile) {
-      setClientError('A selfie is required to get into Explore.');
+      setError('A selfie is required to get into Explore.');
       return;
     }
 
-    setWorking(true);
+    // Build the FormData (incl. async image downscaling) BEFORE the
+    // transition, then call the server action directly inside it. The
+    // action redirect()s on success → clean navigation; on failure it
+    // returns { status: 'error' }.
+    setPreparing(true);
+    let fd: FormData;
     try {
-      const fd = new FormData();
+      fd = new FormData();
       fd.set('payoutMethod', (form.elements.namedItem('payoutMethod') as HTMLSelectElement).value);
       fd.set('payoutHandle', (form.elements.namedItem('payoutHandle') as HTMLInputElement).value);
       fd.set('legalName', (form.elements.namedItem('legalName') as HTMLInputElement).value);
-
-      const selfieBlob = await downscaleImage(selfieFile);
-      fd.set('selfie', selfieBlob, 'selfie.jpg');
-
-      const docFile = docInput?.files?.[0] ?? null;
-      if (docFile) {
-        const docBlob = await downscaleImage(docFile);
-        fd.set('document', docBlob, 'id.jpg');
-      }
-
-      // Hand the prepared FormData to the server action (useActionState
-      // dispatch). Redirects on success; returns {status:'error'} otherwise.
-      formAction(fd);
+      fd.set('selfie', await downscaleImage(selfieFile), 'selfie.jpg');
+      const docFile =
+        (form.elements.namedItem('document') as HTMLInputElement | null)?.files?.[0] ?? null;
+      if (docFile) fd.set('document', await downscaleImage(docFile), 'id.jpg');
     } catch (err) {
-      setClientError(err instanceof Error ? err.message : 'Could not prepare your photos.');
-    } finally {
-      setWorking(false);
+      setPreparing(false);
+      setError(err instanceof Error ? err.message : 'Could not prepare your photos.');
+      return;
     }
+    setPreparing(false);
+
+    startTransition(async () => {
+      const res = await submitCompanionVerificationAction(INITIAL, fd);
+      // Reached only when the action did NOT redirect (i.e. an error).
+      if (res && res.status === 'error') setError(res.message);
+    });
   }
 
-  const busy = working || isPending;
+  const busy = preparing || isPending;
 
   return (
     <form onSubmit={onSubmit} className={styles.form} noValidate>
@@ -163,9 +165,9 @@ export function CompanionVerifyForm() {
         </p>
       </div>
 
-      {(state.status === 'error' || clientError) && (
+      {error && (
         <div className={styles.error} role="alert">
-          {clientError ?? (state.status === 'error' ? state.message : '')}
+          {error}
         </div>
       )}
 
