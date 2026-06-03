@@ -54,6 +54,10 @@ export interface OwnCompanionProfileDTO {
   rating_avg: string;
   /** ISO timestamp when the companion profile was approved; null = unverified. */
   verified_at: string | null;
+  /** True only for full government-ID verification ("Verified" badge);
+   *  false = basic/selfie-only ("Basic"). Lets the owner's own profile
+   *  screen distinguish the two verified tiers and link to the ID step. */
+  fully_verified: boolean;
   /** Payout details (own view only). How the companion gets paid. */
   payout_method: string | null;
   payout_handle: string | null;
@@ -131,6 +135,7 @@ export function toOwnCompanionProfileDTO(
     photo_urls: normalizePhotos(profile.photo_urls),
     rating_avg: profile.rating_avg,
     verified_at: profile.verified_at,
+    fully_verified: profile.id_verified_at !== null,
     payout_method: profile.payout_method,
     payout_handle: profile.payout_handle,
     created_at: profile.created_at,

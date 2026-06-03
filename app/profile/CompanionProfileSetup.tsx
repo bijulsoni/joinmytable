@@ -47,6 +47,9 @@ interface ProfileDTO {
   rates?: Partial<Record<ActivityType, number>>;
   photo_urls?: string[];
   account_verification_status?: 'unverified' | 'pending' | 'verified';
+  /** True only for full government-ID verification. false + verified status
+   *  means Basic (selfie-only) — discoverable but can't yet confirm a meet. */
+  fully_verified?: boolean;
   payout_method?: string | null;
   payout_handle?: string | null;
 }
@@ -377,10 +380,16 @@ export function ProfileSetup() {
   }
 
   const verifStatus = profile.account_verification_status ?? 'unverified';
+  // A 'verified' companion who hasn't done the government-ID step is
+  // "Basic" — discoverable, but blocked from confirming a meet. Surface
+  // that distinct state so they can find their way to the ID upload
+  // instead of seeing a misleading "verified, all done" badge.
+  const isBasicOnly = verifStatus === 'verified' && profile.fully_verified === false;
+  const verifLabel = isBasicOnly ? 'basic' : verifStatus;
   const verifBadgeClass =
-    verifStatus === 'verified'
+    verifStatus === 'verified' && !isBasicOnly
       ? styles.verifVerified
-      : verifStatus === 'pending'
+      : verifStatus === 'pending' || isBasicOnly
         ? styles.verifPending
         : styles.verifUnverified;
 
@@ -606,11 +615,22 @@ export function ProfileSetup() {
         companion.
       </p>
       <div className={styles.verificationRow}>
-        <span className={[styles.verifBadge, verifBadgeClass].join(' ')}>{verifStatus}</span>
-        <Link href="/verify" className={styles.photoLink}>
-          {verifStatus === 'verified' ? 'Manage' : 'Start verification'} →
+        <span className={[styles.verifBadge, verifBadgeClass].join(' ')}>{verifLabel}</span>
+        <Link href={isBasicOnly ? '/verify/companion' : '/verify'} className={styles.photoLink}>
+          {isBasicOnly
+            ? 'Add government ID'
+            : verifStatus === 'verified'
+              ? 'Manage'
+              : 'Start verification'}{' '}
+          →
         </Link>
       </div>
+      {isBasicOnly ? (
+        <p className={styles.cardSubhead}>
+          You&apos;re live as <strong>Basic</strong>. Add a photo of your government ID to earn the
+          Verified badge — it&apos;s required before you can confirm your first meet.
+        </p>
+      ) : null}
 
       <div className={styles.divider} />
 
