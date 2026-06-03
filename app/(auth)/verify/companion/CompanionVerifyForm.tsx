@@ -1,26 +1,86 @@
 'use client';
 
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
+import { useActionState, useState, type FormEvent } from 'react';
 import { submitCompanionVerificationAction, type CompanionVerifyState } from './actions';
 import styles from '../../styles.module.css';
 
 const INITIAL: CompanionVerifyState = { status: 'idle' };
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" className={styles.primary} disabled={pending}>
-      {pending ? 'Submitting...' : 'Submit for review'}
-    </button>
-  );
+// Downscale an image File to a modest JPEG before upload. Phone selfies
+// are often 3–8MB — bigger than the serverless request-body ceiling — so
+// we shrink to <=1600px / quality 0.82 (typically a few hundred KB). If
+// the browser can't decode the image (rare; some HEIC on non-Safari),
+// we fall back to the original file and let the raised body limit handle it.
+async function downscaleImage(file: File): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const maxDim = 1600;
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.82),
+    );
+    return blob ?? file;
+  } catch {
+    return file;
+  }
 }
 
 export function CompanionVerifyForm() {
-  const [state, formAction] = useActionState(submitCompanionVerificationAction, INITIAL);
+  const [state, formAction, isPending] = useActionState(submitCompanionVerificationAction, INITIAL);
+  const [clientError, setClientError] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setClientError(null);
+    const form = e.currentTarget;
+
+    const selfieInput = form.elements.namedItem('selfie') as HTMLInputElement | null;
+    const docInput = form.elements.namedItem('document') as HTMLInputElement | null;
+    const selfieFile = selfieInput?.files?.[0] ?? null;
+    if (!selfieFile) {
+      setClientError('A selfie is required to get into Explore.');
+      return;
+    }
+
+    setWorking(true);
+    try {
+      const fd = new FormData();
+      fd.set('payoutMethod', (form.elements.namedItem('payoutMethod') as HTMLSelectElement).value);
+      fd.set('payoutHandle', (form.elements.namedItem('payoutHandle') as HTMLInputElement).value);
+      fd.set('legalName', (form.elements.namedItem('legalName') as HTMLInputElement).value);
+
+      const selfieBlob = await downscaleImage(selfieFile);
+      fd.set('selfie', selfieBlob, 'selfie.jpg');
+
+      const docFile = docInput?.files?.[0] ?? null;
+      if (docFile) {
+        const docBlob = await downscaleImage(docFile);
+        fd.set('document', docBlob, 'id.jpg');
+      }
+
+      // Hand the prepared FormData to the server action (useActionState
+      // dispatch). Redirects on success; returns {status:'error'} otherwise.
+      formAction(fd);
+    } catch (err) {
+      setClientError(err instanceof Error ? err.message : 'Could not prepare your photos.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  const busy = working || isPending;
 
   return (
-    <form action={formAction} className={styles.form} noValidate encType="multipart/form-data">
+    <form onSubmit={onSubmit} className={styles.form} noValidate>
       <div className={styles.field}>
         <label htmlFor="selfie" className={styles.label}>
           Selfie <span aria-hidden>·</span> required
@@ -103,13 +163,15 @@ export function CompanionVerifyForm() {
         </p>
       </div>
 
-      {state.status === 'error' && (
+      {(state.status === 'error' || clientError) && (
         <div className={styles.error} role="alert">
-          {state.message}
+          {clientError ?? (state.status === 'error' ? state.message : '')}
         </div>
       )}
 
-      <SubmitButton />
+      <button type="submit" className={styles.primary} disabled={busy}>
+        {busy ? 'Submitting…' : 'Submit for review'}
+      </button>
     </form>
   );
 }

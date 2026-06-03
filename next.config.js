@@ -3,6 +3,15 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   typedRoutes: true,
+  // Server Actions default to a 1MB request body — too small for a phone
+  // selfie/ID upload, which made the verification submit crash. Raise to
+  // ~Vercel's serverless body ceiling. The verify form ALSO downscales
+  // images client-side so they comfortably fit.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '4mb',
+    },
+  },
   images: {
     remotePatterns: [
       {
