@@ -58,11 +58,26 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     .eq('id', user.id)
     .maybeSingle();
 
+  // CRITICAL: a session whose user has no public.users mirror row is NOT
+  // a real, signed-up account — so we treat it as signed out. This guards
+  // two ghost-session cases that getSession() (local, unvalidated) would
+  // otherwise wave through:
+  //   1. A DELETED user whose JWT is still structurally valid + unexpired
+  //      (e.g. an account removed server-side; their old cookie lingers).
+  //   2. A half-created OAuth account whose mirror-row creation was rolled
+  //      back at the invite gate, but whose session cookie was left set.
+  // Both signup paths (email + OAuth) create the mirror row BEFORE a
+  // usable session exists, so a genuine signed-in user always has one;
+  // "session but no mirror" only ever means an invalid/ghost session.
+  if (!profile) {
+    return null;
+  }
+
   return {
     id: user.id,
     email: user.email ?? '',
     emailConfirmed: Boolean(user.email_confirmed_at),
-    profile: (profile as UserRow | null) ?? null,
+    profile: profile as UserRow,
   };
 });
 

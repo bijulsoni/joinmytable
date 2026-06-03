@@ -113,7 +113,10 @@ export async function GET(request: NextRequest) {
   const rollbackAuthUser = async (reason: string) => {
     log.warn({ userId: authUser.id, reason }, 'oauth invite gate: rolling back new auth user');
     try {
-      await supabase.auth.signOut();
+      // scope:'local' clears the just-set session cookie WITHOUT a network
+      // round-trip — a global sign-out can throw before clearing locally,
+      // which is exactly how a rejected signup was leaving a live session.
+      await supabase.auth.signOut({ scope: 'local' });
     } catch {
       // still delete the user below
     }
