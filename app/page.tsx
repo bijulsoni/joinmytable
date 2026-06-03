@@ -55,8 +55,8 @@ export default async function HomePage() {
         </p>
 
         <p className={styles.betaNote}>
-          🌲 Now in private beta in the <strong>Seattle–Bellevue area</strong>. Elsewhere? Sign up
-          and we’ll add you to the waitlist for your city.
+          🇺🇸 Now in private beta across the <strong>US</strong>. Outside the US? Sign up and we’ll
+          add you to the waitlist.
         </p>
 
         <div className={styles.ctaRow}>

@@ -22,8 +22,8 @@ export default async function SignUpPage() {
       <h1 className={styles.heading}>Create your account</h1>
       <p className={styles.tagline}>The more AI does, the more human you get to be.</p>
       <p className={styles.subheading}>
-        Konnly is in private beta, open in the Seattle–Bellevue area. Elsewhere? Sign up and
-        we&apos;ll waitlist you for your city.
+        Konnly is in private beta, open across the US. Outside the US? Sign up and we&apos;ll add
+        you to the waitlist.
       </p>
       <SignUpForm />
     </div>

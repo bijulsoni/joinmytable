@@ -21,7 +21,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <div className={styles.shellInner}>{children}</div>
       </main>
       <footer className={styles.shellFooter}>
-        Private beta · Seattle–Bellevue area · Public venues only · Verified companions only
+        Private beta · United States · Public venues only · Verified companions only
       </footer>
     </div>
   );

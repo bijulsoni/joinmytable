@@ -21,15 +21,19 @@ export interface GeoBounds {
   maxLng: number;
 }
 
+// Service area opened up from the Seattle–Bellevue pilot to the whole US
+// for broader beta feedback. Generous box covering all states incl.
+// Alaska + Hawaii (and a bit of North America) — the point is never to
+// block a US user. Truly international signups still fall to the waitlist.
 export const PNW_BOUNDS: GeoBounds = {
-  minLat: 47.3, // ~ south of Renton / Kent
-  maxLat: 47.85, // ~ Bothell / Lynnwood
-  minLng: -122.6, // ~ Puget Sound shoreline
-  maxLng: -121.95, // ~ Issaquah / Sammamish plateau
+  minLat: 18.0, // ~ south of Hawaii
+  maxLat: 72.0, // ~ northern Alaska
+  minLng: -170.0, // ~ western Alaska / Hawaii
+  maxLng: -66.0, // ~ eastern Maine
 };
 
 /** Human-readable name of the open region — used in gate + waitlist copy. */
-export const PNW_REGION_LABEL = 'the Seattle–Bellevue area';
+export const PNW_REGION_LABEL = 'the United States';
 
 /** True when a coordinate falls inside the open beta region. */
 export function isInServiceArea(lat: number, lng: number, bounds: GeoBounds = PNW_BOUNDS): boolean {
