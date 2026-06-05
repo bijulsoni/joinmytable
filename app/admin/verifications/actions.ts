@@ -52,16 +52,18 @@ export async function decideVerificationAction(
   // Build the companion_profiles patch per tier.
   let cpPatch: Record<string, unknown>;
   let userStatus: 'unverified' | 'verified';
+  // Every decision clears id_submitted_at so the applicant drops out of
+  // the full-ID review queue once acted on.
   if (decision === 'reject') {
-    cpPatch = { verified_at: null, id_verified_at: null };
+    cpPatch = { verified_at: null, id_verified_at: null, id_submitted_at: null };
     userStatus = 'unverified';
   } else if (decision === 'approve_basic') {
     // Discoverable, but NOT id-verified (can't accept a meet yet).
-    cpPatch = { verified_at: now };
+    cpPatch = { verified_at: now, id_submitted_at: null };
     userStatus = 'verified';
   } else {
     // approve_full — discoverable AND id-verified (bookable).
-    cpPatch = { verified_at: now, id_verified_at: now };
+    cpPatch = { verified_at: now, id_verified_at: now, id_submitted_at: null };
     userStatus = 'verified';
   }
 

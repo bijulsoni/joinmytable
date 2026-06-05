@@ -19,6 +19,10 @@ type PendingUser = {
   name: string | null;
   email: string | null;
   created_at: string | null;
+  /** 'new' = brand-new applicant (verification_status='pending').
+   *  'id_upgrade' = already-Basic companion who uploaded a government ID
+   *  and is awaiting full-ID review (stays discoverable meanwhile). */
+  kind: 'new' | 'id_upgrade';
 };
 
 type Applicant = PendingUser & {
@@ -93,18 +97,53 @@ async function loadApplicant(
 export default async function VerificationsPage() {
   const admin = authAdminClient();
 
-  // The real "needs review" signal is users.verification_status = 'pending'.
-  // Oldest first so the longest-waiting applicant is at the top.
-  const { data: pending } = await admin
+  // Two streams feed the review queue:
+  //   1) Brand-new applicants — users.verification_status = 'pending'.
+  const { data: pendingRaw } = await admin
     .from('users')
     .select('id, name, email, created_at')
     .eq('verification_status', 'pending')
     .order('created_at', { ascending: true })
     .limit(50);
 
-  const applicants = await Promise.all(
-    (pending ?? []).map((u: PendingUser) => loadApplicant(admin, u)),
-  );
+  //   2) Already-Basic companions who uploaded a government ID and are
+  //      awaiting full-ID review. They stay 'verified' (so they keep their
+  //      Explore visibility) and therefore never appear via the status
+  //      filter above — id_submitted_at (set, with id_verified_at NULL) is
+  //      the signal that surfaces them here.
+  const { data: upgradeProfiles } = await admin
+    .from('companion_profiles')
+    .select('user_id, id_submitted_at')
+    .not('id_submitted_at', 'is', null)
+    .is('id_verified_at', null)
+    .order('id_submitted_at', { ascending: true })
+    .limit(50);
+
+  const upgradeIds = (upgradeProfiles ?? [])
+    .map((p: { user_id: string | null }) => p.user_id)
+    .filter((x: string | null): x is string => Boolean(x));
+
+  let upgradeUsersRaw: Array<Omit<PendingUser, 'kind'>> = [];
+  if (upgradeIds.length > 0) {
+    const { data } = await admin
+      .from('users')
+      .select('id, name, email, created_at')
+      .in('id', upgradeIds);
+    upgradeUsersRaw = (data as Array<Omit<PendingUser, 'kind'>> | null) ?? [];
+  }
+
+  // Merge + dedupe by id. A 'pending' (new) applicant takes precedence over
+  // an id_upgrade tag if somehow both apply.
+  const byId = new Map<string, PendingUser>();
+  for (const u of upgradeUsersRaw) {
+    byId.set(u.id, { ...u, kind: 'id_upgrade' });
+  }
+  for (const u of (pendingRaw as Array<Omit<PendingUser, 'kind'>> | null) ?? []) {
+    byId.set(u.id, { ...u, kind: 'new' });
+  }
+  const queue = [...byId.values()];
+
+  const applicants = await Promise.all(queue.map((u) => loadApplicant(admin, u)));
 
   return (
     <div className={shared.page}>
@@ -127,6 +166,13 @@ export default async function VerificationsPage() {
                   {a.email ?? 'no email'} · applied {relativeTime(a.created_at)} ago
                 </span>
               </div>
+
+              {a.kind === 'id_upgrade' ? (
+                <p className={styles.context}>
+                  <strong>Full-ID review</strong> — already live as Basic. They added a government
+                  ID; approve <strong>Full ID</strong> to let them accept meets.
+                </p>
+              ) : null}
 
               {a.serviceArea ? (
                 <p className={styles.context}>

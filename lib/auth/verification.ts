@@ -57,6 +57,37 @@ export async function submitCompanionVerification(
   if (!row) {
     return { ok: false, error: 'Profile not found.' };
   }
+
+  // If a government ID was provided, stamp id_submitted_at so the admin
+  // full-ID review queue surfaces this person. This is what was missing:
+  // an already-'verified' Basic companion adding their ID would otherwise
+  // hit the early-return below and leave NO signal anywhere — the ID sat
+  // in storage, unreviewable. We do NOT move a Basic companion back to
+  // 'pending' (that would drop them out of Explore); id_submitted_at is a
+  // separate signal that keeps them discoverable while their ID is reviewed.
+  if (input.documentPath) {
+    const nowIso = new Date().toISOString();
+    const { data: cpRow } = await supabase
+      .from('companion_profiles')
+      .select('user_id')
+      .eq('user_id', auth.user.id)
+      .maybeSingle();
+    if (cpRow) {
+      await supabase
+        .from('companion_profiles')
+        .update({ id_submitted_at: nowIso })
+        .eq('user_id', auth.user.id);
+    } else {
+      await supabase
+        .from('companion_profiles')
+        .insert({ user_id: auth.user.id, id_submitted_at: nowIso });
+    }
+  }
+
+  // Status transition: a brand-new applicant (unverified) moves to
+  // 'pending' for first review. An already verified/pending user stays as
+  // is — a Basic companion adding an ID keeps their 'verified' status (and
+  // Explore visibility); the id_submitted_at stamp above queues the review.
   if (row.verification_status === 'verified' || row.verification_status === 'pending') {
     return { ok: true, status: row.verification_status };
   }

@@ -100,6 +100,11 @@ export interface CompanionProfileRow {
   /** Set when full government-ID verified. NULL = basic/selfie-only.
    *  Required to accept a request (confirm an in-person meet). */
   id_verified_at: string | null;
+  /** Set when the companion uploads a government ID awaiting full-ID
+   *  review. id_submitted_at set + id_verified_at NULL = in the admin
+   *  full-ID review queue (while staying discoverable as Basic). Cleared
+   *  on the admin decision. */
+  id_submitted_at: string | null;
   /** Founding Companion (first 100 verified). Perk: no platform fee. */
   is_founding: boolean;
   /** Payout method (venmo|zelle|paypal) + handle. Admin-only — never in
